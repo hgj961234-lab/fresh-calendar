@@ -271,6 +271,7 @@ function AppContent({ user }) {
         return { ...data, id: d.id, expiry: data.expiry.toDate(), addedDate: data.addedDate.toDate() };
       });
       setIngredients(items);
+      checkNotifications(items); // 🔥 데이터 로드시 알림 체크
     });
 
     const qCart = query(collection(db, `users/${user.uid}/cart`));
@@ -279,7 +280,26 @@ function AppContent({ user }) {
     return () => { unsubIng(); unsubCart(); };
   }, [user]);
 
-  const requestNotiPermission = () => { if ("Notification" in window) Notification.requestPermission(); };
+  // 알림 권한 요청 및 체크 (Warning 포함)
+  const checkNotifications = (items) => {
+    if (!("Notification" in window)) return;
+    if (Notification.permission !== "granted") return;
+
+    // Danger 또는 Warning 상태인 아이템 필터링
+    const urgentCount = items.filter(i => {
+      const risk = getRiskLevel(i.expiry, i.name);
+      return risk === 'danger' || risk === 'warning' || risk === 'expired';
+    }).length;
+
+    if (urgentCount > 0) {
+      // 잦은 알림 방지 로직은 생략 (실제 앱에서는 필요)
+      // new Notification("Fresh Calendar", { body: `주의/위험 식재료가 ${urgentCount}개 있습니다!` });
+    }
+  };
+
+  const requestNotiPermission = () => {
+    if ("Notification" in window) Notification.requestPermission();
+  };
 
   const addItem = async (item) => {
     try { await addDoc(collection(db, `users/${user.uid}/ingredients`), { ...item, addedDate: new Date(), expiry: item.expiry }); } catch (e) { alert("저장 실패: " + e.message); }
@@ -494,7 +514,7 @@ function FridgeListView({ ingredients, getRiskLevel, deleteItems, updateItemExpi
   );
 }
 
-// --- 추가 모달 ---
+// --- 추가 모달 (김치 버튼 추가) ---
 function AddItemModal({ onClose, onAdd, initialDate }) {
   const [name, setName] = useState('');
   const getInitialExpiry = () => { try { if (initialDate && !isNaN(initialDate.getTime())) return initialDate.toISOString().split('T')[0]; } catch(e){} return new Date().toISOString().split('T')[0]; };
@@ -514,7 +534,7 @@ function AddItemModal({ onClose, onAdd, initialDate }) {
       <div className="flex items-center gap-2 mb-6"><button onClick={onClose}><ArrowLeft /></button><h2 className="text-lg font-bold">새 식재료 추가</h2></div>
       <form onSubmit={handleSubmit} className="space-y-6">
         <div><label className="block text-sm font-bold text-gray-700 mb-2">이름</label><input value={name} onChange={e=>setName(e.target.value)} className="w-full p-4 bg-gray-50 rounded-xl border-none focus:ring-2 focus:ring-green-500" placeholder="예: 삼겹살, 시금치" autoFocus required /></div>
-        <div><label className="block text-sm font-bold text-gray-700 mb-2">빠른 설정</label><div className="flex gap-2 overflow-x-auto pb-1"><button type="button" onClick={() => setExpiryByCategory(3, '고기')} className="px-3 py-2 bg-red-50 text-red-600 rounded-lg text-xs font-bold border border-red-100 whitespace-nowrap">🥩 고기 (3일)</button><button type="button" onClick={() => setExpiryByCategory(7, '채소')} className="px-3 py-2 bg-green-50 text-green-600 rounded-lg text-xs font-bold border border-green-100 whitespace-nowrap">🥬 채소 (7일)</button><button type="button" onClick={() => setExpiryByCategory(14, '유제품')} className="px-3 py-2 bg-yellow-50 text-yellow-600 rounded-lg text-xs font-bold border border-yellow-100 whitespace-nowrap">🥛 유제품 (14일)</button><button type="button" onClick={() => setExpiryByCategory(30, '냉동')} className="px-3 py-2 bg-blue-50 text-blue-600 rounded-lg text-xs font-bold border border-blue-100 whitespace-nowrap">❄️ 냉동 (30일)</button></div></div>
+        <div><label className="block text-sm font-bold text-gray-700 mb-2">빠른 설정</label><div className="flex gap-2 overflow-x-auto pb-1"><button type="button" onClick={() => setExpiryByCategory(3, '고기')} className="px-3 py-2 bg-red-50 text-red-600 rounded-lg text-xs font-bold border border-red-100 whitespace-nowrap">🥩 고기 (3일)</button><button type="button" onClick={() => setExpiryByCategory(7, '채소')} className="px-3 py-2 bg-green-50 text-green-600 rounded-lg text-xs font-bold border border-green-100 whitespace-nowrap">🥬 채소 (7일)</button><button type="button" onClick={() => setExpiryByCategory(90, '김치')} className="px-3 py-2 bg-red-100 text-red-700 rounded-lg text-xs font-bold border border-red-200 whitespace-nowrap">🌶️ 김치 (90일)</button><button type="button" onClick={() => setExpiryByCategory(14, '유제품')} className="px-3 py-2 bg-yellow-50 text-yellow-600 rounded-lg text-xs font-bold border border-yellow-100 whitespace-nowrap">🥛 유제품 (14일)</button><button type="button" onClick={() => setExpiryByCategory(30, '냉동')} className="px-3 py-2 bg-blue-50 text-blue-600 rounded-lg text-xs font-bold border border-blue-100 whitespace-nowrap">❄️ 냉동 (30일)</button></div></div>
         <div><label className="block text-sm font-bold text-gray-700 mb-2">유통기한</label><input type="date" value={expiry} onChange={e=>setExpiry(e.target.value)} className="w-full p-4 bg-gray-50 rounded-xl border-none focus:ring-2 focus:ring-green-500" required /></div>
         <div><label className="block text-sm font-bold text-gray-700 mb-2">보관 장소</label><div className="flex gap-3">{['fridge', 'freezer', 'pantry'].map(c => (<button type="button" key={c} onClick={() => setCategory(c)} className={`flex-1 py-3 rounded-xl capitalize font-bold transition-all ${category === c ? 'bg-green-100 text-green-700 ring-2 ring-green-500' : 'bg-gray-100 text-gray-400'}`}>{c}</button>))}</div></div>
         <button className="w-full bg-green-600 text-white py-4 rounded-xl font-bold text-lg shadow-lg mt-auto">저장하기</button>
@@ -543,7 +563,7 @@ function ShoppingCartView({ cart, onUpdateCount, onRemove, onCheckout }) {
   );
 }
 
-// --- 레시피 뷰 ---
+// --- 레시피 뷰 (전체선택 추가) ---
 function RecipeView({ ingredients, onAddToCart, recipes }) { 
   const [selectedIngredients, setSelectedIngredients] = useState([]);
   const [selectedRecipe, setSelectedRecipe] = useState(null);
@@ -552,6 +572,13 @@ function RecipeView({ ingredients, onAddToCart, recipes }) {
   const categories = ['All', 'Korean', 'Japanese', 'Chinese', 'Italian', 'Other'];
 
   const toggleSelection = (name) => { if (selectedIngredients.includes(name)) setSelectedIngredients(selectedIngredients.filter(i => i !== name)); else setSelectedIngredients([...selectedIngredients, name]); };
+  
+  // 🔥 전체 선택 버튼 함수
+  const toggleSelectAll = () => {
+    if (selectedIngredients.length === ingredients.length) setSelectedIngredients([]); // 이미 다 선택됐으면 해제
+    else setSelectedIngredients(ingredients.map(i => i.name)); // 아니면 전체 선택
+  };
+
   const scaleText = (text, multiplier) => { if (multiplier === 1) return text; return text.replace(/(\d+\/\d+|\d+(?:\.\d+)?)(\s*[a-zA-Zㄱ-ㅎㅏ-ㅣ가-힣%도]*)/g, (match, number, unit) => { let val = number.includes('/') ? parseInt(number.split('/')[0]) / parseInt(number.split('/')[1]) : parseFloat(number); if (!val) return match; let scaled = val * multiplier; return `${Number.isInteger(scaled) ? scaled : parseFloat(scaled.toFixed(1))}${unit}`; }); };
   const getMatchedRecipes = () => { let filtered = recipes; if (filterCategory !== 'All') filtered = filtered.filter(r => r.category === filterCategory); return filtered.map(recipe => { const existing = recipe.ingredients.filter(req => selectedIngredients.some(sel => req.includes(sel) || sel.includes(req))); const missing = recipe.ingredients.filter(req => !selectedIngredients.some(sel => req.includes(sel) || sel.includes(req))); return { ...recipe, existing, missing, score: existing.length }; }).sort((a, b) => b.score - a.score); };
   const matchedRecipes = getMatchedRecipes();
@@ -569,7 +596,16 @@ function RecipeView({ ingredients, onAddToCart, recipes }) {
 
   return (
     <div className="p-4 pb-20 h-full flex flex-col">
-      <div className="mb-6"><h2 className="text-lg font-bold mb-2">1. Select Leftovers</h2><div className="flex flex-wrap gap-2">{ingredients.map(item => (<button key={item.id} onClick={() => toggleSelection(item.name)} className={`px-3 py-1.5 rounded-full text-sm border transition-all ${selectedIngredients.includes(item.name) ? 'bg-green-600 text-white border-green-600 shadow-md' : 'bg-white text-gray-600 border-gray-200 hover:border-green-300'}`}>{item.name}</button>))}</div></div>
+      <div className="mb-6">
+        <h2 className="text-lg font-bold mb-2 flex justify-between items-center">
+          1. Select Leftovers
+          {/* 🔥 전체 선택 버튼 추가 */}
+          <button onClick={toggleSelectAll} className="text-xs font-medium text-green-600 flex items-center gap-1 bg-green-50 px-2 py-1 rounded-lg hover:bg-green-100">
+            <CheckSquare size={14} /> 전체 선택
+          </button>
+        </h2>
+        <div className="flex flex-wrap gap-2">{ingredients.map(item => (<button key={item.id} onClick={() => toggleSelection(item.name)} className={`px-3 py-1.5 rounded-full text-sm border transition-all ${selectedIngredients.includes(item.name) ? 'bg-green-600 text-white border-green-600 shadow-md' : 'bg-white text-gray-600 border-gray-200 hover:border-green-300'}`}>{item.name}</button>))}</div>
+      </div>
       <div className="flex gap-2 overflow-x-auto pb-2 mb-2 no-scrollbar">{categories.map(cat => (<button key={cat} onClick={() => setFilterCategory(cat)} className={`whitespace-nowrap px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${filterCategory === cat ? 'bg-gray-800 text-white' : 'bg-gray-100 text-gray-500'}`}>{cat}</button>))}</div>
       <div className="flex-1 overflow-y-auto space-y-3">{matchedRecipes.map(recipe => (<div key={recipe.id} onClick={() => setSelectedRecipe(recipe)} className={`bg-white p-4 rounded-xl border shadow-sm cursor-pointer transition-all hover:border-green-300 ${recipe.score > 0 ? 'border-green-200 bg-green-50' : 'border-gray-100'}`}><div className="flex justify-between items-start mb-1"><h3 className="font-bold text-gray-800">{recipe.name}</h3>{recipe.score > 0 && <span className="text-[10px] bg-green-200 text-green-800 px-1.5 py-0.5 rounded font-bold">Match</span>}</div>{recipe.score > 0 ? (<div className="text-xs text-gray-600"><span className="text-green-600 font-medium">Have: {recipe.existing.join(', ')}</span>{recipe.missing.length > 0 && <span className="text-gray-400 ml-2">Missing: {recipe.missing.slice(0, 3).join(', ')}...</span>}</div>) : (<p className="text-xs text-gray-400 line-clamp-1">{recipe.measure}</p>)}</div>))}</div>
     </div>
