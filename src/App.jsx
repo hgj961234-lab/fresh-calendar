@@ -26,7 +26,7 @@ import {
   query
 } from "firebase/firestore";
 
-// ⚠️ 본인의 Firebase 설정값을 여기에 붙여넣으세요!
+// ⚠️ 사용자 제공 Firebase 설정값 적용 완료
 const firebaseConfig = {
   apiKey: "AIzaSyA8k03QUr1vTjiNLe1EhZpPTy4PVoqM808",
   authDomain: "fresh-calendar-107af.firebaseapp.com",
@@ -40,139 +40,74 @@ const firebaseConfig = {
 // Firebase 초기화
 let app, auth, db;
 try {
-  if (Object.keys(firebaseConfig).length > 0) {
-    app = initializeApp(firebaseConfig);
-    auth = getAuth(app);
-    db = getFirestore(app);
-  }
+  app = initializeApp(firebaseConfig);
+  auth = getAuth(app);
+  db = getFirestore(app);
 } catch (e) {
   console.error("Firebase Init Error:", e);
 }
 
-// --- 유통기한 데이터베이스 (전체 복구) ---
+// --- 유통기한 데이터베이스 (재료별 위험도 설정 포함) ---
+// risk: { danger: N일전(빨강), warning: N일전(노랑) }
 const SHELF_LIFE_DB = {
+  // 고기류 (상하기 쉬움 -> 기준을 엄격하게)
+  '돼지고기': { fridge: 3, freezer: 30, risk: { danger: 1, warning: 2 } }, 
+  '소고기': { fridge: 3, freezer: 30, risk: { danger: 1, warning: 2 } },
+  '닭고기': { fridge: 2, freezer: 90, risk: { danger: 1, warning: 2 } },
+  '오리훈제': { fridge: 14, freezer: 180, risk: { danger: 2, warning: 5 } },
+  '양고기': { fridge: 3, freezer: 180, risk: { danger: 1, warning: 2 } },
+  '베이컨': { fridge: 7, freezer: 30, risk: { danger: 2, warning: 4 } },
+  '햄': { fridge: 7, freezer: 30, risk: { danger: 2, warning: 4 } },
+  '소시지': { fridge: 14, freezer: 60, risk: { danger: 3, warning: 7 } },
+
+  // 해산물
+  '고등어': { fridge: 2, freezer: 90, risk: { danger: 1, warning: 2 } },
+  '연어': { fridge: 2, freezer: 90, risk: { danger: 1, warning: 2 } },
+  '새우': { fridge: 2, freezer: 180, risk: { danger: 1, warning: 2 } },
+  '오징어': { fridge: 2, freezer: 180, risk: { danger: 1, warning: 2 } },
+  '바지락': { fridge: 2, freezer: 90, risk: { danger: 1, warning: 2 } },
+
   // 유제품 & 계란
-  '우유': { fridge: 7, freezer: 30, pantry: 0.1 }, 'milk': { fridge: 7, freezer: 30 },
-  '달걀': { fridge: 30, freezer: 0, pantry: 7 }, 'eggs': { fridge: 30, freezer: 0 },
-  '요거트': { fridge: 10, freezer: 30 }, 'yogurt': { fridge: 10, freezer: 30 },
-  '치즈': { fridge: 20, freezer: 180 }, 'cheese': { fridge: 20, freezer: 180 },
-  '생크림': { fridge: 7, freezer: 30 }, 'heavy cream': { fridge: 7, freezer: 30 },
-  '마스카포네': { fridge: 7, freezer: 0 }, 'mascarpone': { fridge: 7 },
-  '버터': { fridge: 90, freezer: 365 }, 'butter': { fridge: 90, freezer: 365 },
+  '우유': { fridge: 7, freezer: 30, risk: { danger: 2, warning: 4 } }, 
+  '달걀': { fridge: 30, freezer: 0, risk: { danger: 3, warning: 7 } },
+  '요거트': { fridge: 10, freezer: 30, risk: { danger: 2, warning: 5 } },
+  '치즈': { fridge: 20, freezer: 180, risk: { danger: 3, warning: 7 } },
+  '생크림': { fridge: 7, freezer: 30, risk: { danger: 2, warning: 4 } },
+  '버터': { fridge: 90, freezer: 365, risk: { danger: 7, warning: 14 } },
 
   // 채소 & 농산물
-  '두부': { fridge: 5, freezer: 90 }, 'tofu': { fridge: 5, freezer: 90 },
-  '콩나물': { fridge: 5, freezer: 0 }, 'bean sprouts': { fridge: 5 },
-  '숙주': { fridge: 3, freezer: 0 }, 'mung bean sprouts': { fridge: 3 },
-  '양파': { fridge: 14, freezer: 180, pantry: 30 }, 'onion': { fridge: 14, freezer: 180, pantry: 30 },
-  '감자': { fridge: 30, freezer: 365, pantry: 60 }, 'potato': { fridge: 30, freezer: 365, pantry: 60 },
-  '김치': { fridge: 90, freezer: 0 }, 'kimchi': { fridge: 90 },
-  '마늘': { fridge: 30, freezer: 365, pantry: 14 }, 'garlic': { fridge: 30, freezer: 365 },
-  '대파': { fridge: 14, freezer: 180 }, 'green onion': { fridge: 14, freezer: 180 },
-  '쪽파': { fridge: 7, freezer: 90 }, 'chives': { fridge: 7, freezer: 90 },
-  '부추': { fridge: 5, freezer: 90 }, 'leek': { fridge: 5, freezer: 90 },
-  '오이': { fridge: 7, freezer: 0 }, 'cucumber': { fridge: 7 },
-  '배추': { fridge: 20, freezer: 90 }, 'napa cabbage': { fridge: 20, freezer: 90 },
-  '양배추': { fridge: 30, freezer: 90 }, 'cabbage': { fridge: 30, freezer: 90 },
-  '양상추': { fridge: 7, freezer: 0 }, 'lettuce': { fridge: 7 },
-  '청경채': { fridge: 7, freezer: 30 }, 'bok choy': { fridge: 7 },
-  '고추': { fridge: 14, freezer: 180 }, 'chili': { fridge: 14, freezer: 180 },
-  '브로콜리': { fridge: 5, freezer: 365 }, 'broccoli': { fridge: 5, freezer: 365 },
-  '오크라': { fridge: 3, freezer: 180 }, 'okra': { fridge: 3, freezer: 180 },
-  '아보카도': { fridge: 5, freezer: 180, pantry: 3 }, 'avocado': { fridge: 5, freezer: 180, pantry: 3 },
-  '송이버섯': { fridge: 7, freezer: 30 }, 'pine mushroom': { fridge: 7, freezer: 30 },
-  '느타리버섯': { fridge: 5, freezer: 30 }, 'oyster mushroom': { fridge: 5, freezer: 30 },
-  '팽이버섯': { fridge: 7, freezer: 30 }, 'enoki mushroom': { fridge: 7, freezer: 30 },
-  '표고버섯': { fridge: 7, freezer: 180 }, 'shiitake mushroom': { fridge: 7, freezer: 180 },
-  '당근': { fridge: 21, freezer: 365 }, 'carrot': { fridge: 21, freezer: 365 },
-  '무': { fridge: 14, freezer: 90 }, 'radish': { fridge: 14, freezer: 90 },
-  '애호박': { fridge: 7, freezer: 90 }, 'zucchini': { fridge: 7, freezer: 90 },
-  '토마토': { fridge: 10, freezer: 90, pantry: 5 }, 'tomato': { fridge: 10, freezer: 90, pantry: 5 },
-  '고수': { fridge: 5, freezer: 30 }, 'cilantro': { fridge: 5 },
-  '바질': { fridge: 5, freezer: 90 }, 'basil': { fridge: 5, freezer: 90 },
-  '레몬': { fridge: 30, freezer: 90 }, 'lemon': { fridge: 30, freezer: 90 },
-  '라임': { fridge: 30, freezer: 90 }, 'lime': { fridge: 30, freezer: 90 },
+  '두부': { fridge: 5, freezer: 90, risk: { danger: 1, warning: 3 } },
+  '콩나물': { fridge: 5, freezer: 0, risk: { danger: 1, warning: 3 } },
+  '숙주': { fridge: 3, freezer: 0, risk: { danger: 1, warning: 2 } },
+  '양파': { fridge: 14, freezer: 180, risk: { danger: 3, warning: 5 } },
+  '감자': { fridge: 30, freezer: 365, risk: { danger: 5, warning: 10 } },
+  '김치': { fridge: 90, freezer: 0, risk: { danger: 7, warning: 14 } },
+  '마늘': { fridge: 30, freezer: 365, risk: { danger: 5, warning: 10 } },
+  '대파': { fridge: 14, freezer: 180, risk: { danger: 3, warning: 5 } },
+  '오이': { fridge: 7, freezer: 0, risk: { danger: 2, warning: 4 } },
+  '양배추': { fridge: 30, freezer: 90, risk: { danger: 5, warning: 10 } },
+  '당근': { fridge: 21, freezer: 365, risk: { danger: 3, warning: 7 } },
+  '무': { fridge: 14, freezer: 90, risk: { danger: 3, warning: 6 } },
+  '애호박': { fridge: 7, freezer: 90, risk: { danger: 2, warning: 4 } },
+  '토마토': { fridge: 10, freezer: 90, risk: { danger: 2, warning: 5 } },
+  '고수': { fridge: 5, freezer: 30, risk: { danger: 1, warning: 3 } },
+  '바질': { fridge: 5, freezer: 90, risk: { danger: 1, warning: 3 } },
 
   // 과일
-  '사과': { fridge: 21, freezer: 0, pantry: 7 }, 'apple': { fridge: 21, pantry: 7 },
-  '바나나': { fridge: 5, freezer: 90, pantry: 5 }, 'banana': { fridge: 5, freezer: 90, pantry: 5 },
-  '딸기': { fridge: 3, freezer: 180 }, 'strawberry': { fridge: 3, freezer: 180 },
-  '귤': { fridge: 14, freezer: 0, pantry: 7 }, 'tangerine': { fridge: 14, pantry: 7 },
-  '감': { fridge: 14, freezer: 0, pantry: 7 }, 'persimmon': { fridge: 14, pantry: 7 },
-  '수박': { fridge: 5, freezer: 30 }, 'watermelon': { fridge: 5, freezer: 30 },
-  '체리': { fridge: 5, freezer: 180 }, 'cherry': { fridge: 5, freezer: 180 },
-  '참외': { fridge: 7, freezer: 0 }, 'korean melon': { fridge: 7 },
-  '복숭아': { fridge: 5, freezer: 90 }, 'peach': { fridge: 5, freezer: 90 },
-  '메론': { fridge: 7, freezer: 30 }, 'melon': { fridge: 7, freezer: 30 },
-  '배': { fridge: 14, freezer: 0, pantry: 7 }, 'pear': { fridge: 14, pantry: 7 },
+  '사과': { fridge: 21, freezer: 0, risk: { danger: 3, warning: 7 } }, 
+  '바나나': { fridge: 5, freezer: 90, risk: { danger: 1, warning: 2 } },
+  '딸기': { fridge: 3, freezer: 180, risk: { danger: 1, warning: 2 } },
+  '귤': { fridge: 14, freezer: 0, risk: { danger: 3, warning: 6 } },
 
-  // 고기 & 해산물
-  '돼지고기': { fridge: 3, freezer: 180 }, 'pork': { fridge: 3, freezer: 180 },
-  '소고기': { fridge: 3, freezer: 180 }, 'beef': { fridge: 3, freezer: 180 },
-  '닭고기': { fridge: 2, freezer: 270 }, 'chicken': { fridge: 2, freezer: 270 },
-  '오리훈제': { fridge: 14, freezer: 180 }, 'smoked duck': { fridge: 14, freezer: 180 },
-  '양고기': { fridge: 3, freezer: 180 }, 'lamb': { fridge: 3, freezer: 180 },
-  '베이컨': { fridge: 7, freezer: 30 }, 'bacon': { fridge: 7, freezer: 30 },
-  '햄': { fridge: 7, freezer: 30 }, 'ham': { fridge: 7, freezer: 30 },
-  '소시지': { fridge: 14, freezer: 60 }, 'sausage': { fridge: 14, freezer: 60 },
-  '고등어': { fridge: 2, freezer: 90 }, 'mackerel': { fridge: 2, freezer: 90 },
-  '갈치': { fridge: 2, freezer: 180 }, 'hairtail': { fridge: 2, freezer: 180 },
-  '삼치': { fridge: 2, freezer: 90 }, 'spanish mackerel': { fridge: 2, freezer: 90 },
-  '연어': { fridge: 2, freezer: 90 }, 'salmon': { fridge: 2, freezer: 90 },
-  '새우': { fridge: 2, freezer: 180 }, 'shrimp': { fridge: 2, freezer: 180 },
-  '오징어': { fridge: 2, freezer: 180 }, 'squid': { fridge: 2, freezer: 180 },
-  '바지락': { fridge: 2, freezer: 90 }, 'clams': { fridge: 2, freezer: 90 },
-  '문어': { fridge: 2, freezer: 90 }, 'octopus': { fridge: 2, freezer: 90 },
-
-  // 곡류 & 면 & 기타
-  '밥': { fridge: 3, freezer: 30 }, 'rice': { fridge: 3, freezer: 30 },
-  '떡': { fridge: 3, freezer: 180 }, 'rice cake': { fridge: 3, freezer: 180 },
-  '칼국수면': { fridge: 5, freezer: 30 }, 'kalguksu noodles': { fridge: 5 },
-  '우동면': { fridge: 30, freezer: 180 }, 'udon noodles': { fridge: 30, freezer: 180 },
-  '소면': { pantry: 730 }, 'somen': { pantry: 730 },
-  '당면': { pantry: 730 }, 'glass noodles': { pantry: 730 },
-  '파스타면': { pantry: 730 }, 'pasta': { pantry: 730 },
-  '라멘면': { fridge: 7, freezer: 30 }, 'ramen noodles': { fridge: 7 },
-  '중화면': { fridge: 7, freezer: 30 }, 'chinese noodles': { fridge: 7 },
-  '쌀국수면': { pantry: 730 }, 'rice noodles': { pantry: 730 },
-  '또띠아': { fridge: 7, freezer: 180 }, 'tortilla': { fridge: 7, freezer: 180 },
-  '바게트': { pantry: 2, freezer: 30 }, 'baguette': { pantry: 2, freezer: 30 },
-  '식빵': { pantry: 3, freezer: 30 }, 'bread': { pantry: 3, freezer: 30 },
-  '만두피': { fridge: 5, freezer: 30 }, 'dumpling wrapper': { fridge: 5, freezer: 30 },
-
-  // 소스 & 팬트리
-  '간장': { fridge: 365, freezer: 0, pantry: 365 }, 
-  '국간장': { fridge: 365, freezer: 0, pantry: 365 }, 
-  '참치액': { fridge: 365, freezer: 0, pantry: 365 }, 
-  '고추장': { fridge: 365, freezer: 0, pantry: 180 }, 
-  '된장': { fridge: 365, freezer: 0, pantry: 180 }, 
-  '쌈장': { fridge: 180, freezer: 0 }, 
-  '춘장': { fridge: 180, pantry: 90 },
-  '두반장': { fridge: 365, pantry: 180 },
-  '마라소스': { fridge: 180, pantry: 180 },
-  '굴소스': { fridge: 180, pantry: 0 },
-  '피시소스': { fridge: 365, pantry: 365 },
-  '쯔유': { fridge: 60, pantry: 0 },
-  '참기름': { fridge: 180, freezer: 0, pantry: 90 }, 
-  '들기름': { fridge: 30, freezer: 0 }, 
-  '올리브오일': { fridge: 0, freezer: 0, pantry: 540 }, 
-  '식용유': { pantry: 365 },
-  '홀그레인 머스타드': { fridge: 180, freezer: 0 }, 
-  '케찹': { fridge: 180, freezer: 0, pantry: 30 }, 
-  '마요네즈': { fridge: 90, freezer: 0, pantry: 0 },
-  '식초': { pantry: 1000 },
-  '설탕': { pantry: 1000 },
-  '소금': { pantry: 1000 },
-  '후추': { pantry: 1000 },
-  '전분': { pantry: 730 }, 'starch': { pantry: 730 },
-  '부침가루': { pantry: 365 }, 'flour': { pantry: 365 },
-  '튀김가루': { pantry: 365 },
-  '카레가루': { pantry: 365 }, 'curry powder': { pantry: 365 },
-  '땅콩': { pantry: 90, freezer: 180 }, 'peanuts': { pantry: 90 },
-  '커피': { pantry: 365 }, 'coffee': { pantry: 365 },
+  // 곡류 & 기타
+  '밥': { fridge: 3, freezer: 30, risk: { danger: 1, warning: 2 } },
+  '식빵': { pantry: 3, freezer: 30, risk: { danger: 1, warning: 2 } },
+  
+  // 기본값 (DB에 없는 재료용)
+  'default': { fridge: 7, risk: { danger: 2, warning: 4 } }
 };
 
-// --- 레시피 데이터베이스 (전체 복구) ---
+// --- 레시피 데이터베이스 (전체 60종 복구) ---
 const RECIPE_FULL_DB = [
   // --- 한식 (1-20) ---
   { id: 1, category: 'Korean', name: '김치찌개', ingredients: ['김치', '돼지고기', '두부', '대파'], measure: '김치 150g, 돼지고기 100g, 두부 1/4모, 대파 10cm, 다진마늘 0.5T, 고춧가루 0.5T, 설탕 0.3T, 물 300ml', steps: ['1. [재료 손질] 돼지고기와 김치는 한입 크기로 썰고, 두부는 1cm 두께로, 대파는 어슷하게 썰어 준비합니다.', '2. [고기 볶기] 냄비에 식용유 1T를 두르고 돼지고기를 넣은 뒤, 고기 겉면이 하얗게 익을 때까지 중불에서 볶습니다.', '3. [김치 볶기] 고기 기름이 나오면 김치와 설탕 0.3T를 넣고 김치가 투명해질 때까지 3분간 충분히 볶아 신맛을 잡습니다.', '4. [끓이기] 물(또는 쌀뜨물) 300ml를 붓고 센불로 올린 뒤, 국물이 팔팔 끓어오르면 5분간 유지합니다.', '5. [양념하기] 다진 마늘 0.5T, 고춧가루 0.5T를 넣어 색과 향을 더하고 중불로 줄입니다.', '6. [마무리] 두부를 넣고 국물을 끼얹으며 3분간 더 끓인 뒤, 마지막에 대파를 넣고 한소끔 끓여 완성합니다.'] },
@@ -266,13 +201,12 @@ export default function FreshCalendar() {
     return () => unsubscribe();
   }, []);
 
-  // Firebase 설정값이 없을 때 안내 화면
   if (!auth) {
     return (
       <div className="h-screen flex flex-col items-center justify-center p-6 text-center bg-gray-50">
         <AlertTriangle className="text-red-500 w-16 h-16 mb-4" />
-        <h1 className="text-2xl font-bold mb-2">Firebase 설정 필요</h1>
-        <p className="text-gray-600">App.jsx 파일 상단의 <code>firebaseConfig</code> 객체에<br/>설정값을 채워넣어 주세요.</p>
+        <h1 className="text-2xl font-bold mb-2">Firebase 오류</h1>
+        <p className="text-gray-600">설정값을 확인해주세요.</p>
       </div>
     );
   }
@@ -339,8 +273,7 @@ function AppContent({ user }) {
         return { ...data, id: d.id, expiry: data.expiry.toDate(), addedDate: data.addedDate.toDate() };
       });
       setIngredients(items);
-      checkNotifications(items); // 데이터 로드시 알림 체크
-    });
+    }, (error) => console.error("Firestore Read Error:", error));
 
     const qCart = query(collection(db, `users/${user.uid}/cart`));
     const unsubCart = onSnapshot(qCart, (snap) => setCart(snap.docs.map(d => ({...d.data(), id: d.id}))));
@@ -348,33 +281,20 @@ function AppContent({ user }) {
     return () => { unsubIng(); unsubCart(); };
   }, [user]);
 
-  // 알림 권한 요청 및 체크
-  const checkNotifications = (items) => {
-    if (!("Notification" in window)) return;
-    if (Notification.permission !== "granted") return;
-
-    const urgentCount = items.filter(i => getRiskLevel(i.expiry) === 'danger' || getRiskLevel(i.expiry) === 'expired').length;
-    if (urgentCount > 0) {
-      // 잦은 알림 방지를 위해 마지막 알림 시간을 체크할 수 있으나 여기선 생략
-      // new Notification("Fresh Calendar", { body: `유통기한 임박 상품이 ${urgentCount}개 있습니다!` });
-    }
-  };
-
+  // 알림 권한 요청
   const requestNotiPermission = () => {
-    if (!("Notification" in window)) {
-      alert("이 브라우저는 알림을 지원하지 않습니다.");
-      return;
-    }
-    Notification.requestPermission().then(permission => {
-      if (permission === "granted") alert("알림이 설정되었습니다! 앱을 켜두면 만료 알림을 받습니다.");
-    });
+    if ("Notification" in window) Notification.requestPermission();
   };
 
   // CRUD Helpers
   const addItem = async (item) => {
-    await addDoc(collection(db, `users/${user.uid}/ingredients`), {
-      ...item, addedDate: new Date(), expiry: item.expiry
-    });
+    try {
+      await addDoc(collection(db, `users/${user.uid}/ingredients`), {
+        ...item, addedDate: new Date(), expiry: item.expiry
+      });
+    } catch (error) {
+      alert("저장 실패: " + error.message);
+    }
   };
   
   const deleteItems = async (ids) => {
@@ -385,82 +305,63 @@ function AppContent({ user }) {
     const existing = cart.find(c => c.name === name);
     if (!existing) return;
     const newCount = existing.count + delta;
-    if (newCount <= 0) {
-      await deleteDoc(doc(db, `users/${user.uid}/cart`, existing.id));
-    } else {
-      await updateDoc(doc(db, `users/${user.uid}/cart`, existing.id), { count: newCount });
-    }
+    if (newCount <= 0) await deleteDoc(doc(db, `users/${user.uid}/cart`, existing.id));
+    else await updateDoc(doc(db, `users/${user.uid}/cart`, existing.id), { count: newCount });
   };
 
   const removeItemsFromCart = async (names) => { 
     const itemsToRemove = cart.filter(c => names.includes(c.name));
-    for (const item of itemsToRemove) {
-      await deleteDoc(doc(db, `users/${user.uid}/cart`, item.id));
-    }
+    for (const item of itemsToRemove) await deleteDoc(doc(db, `users/${user.uid}/cart`, item.id));
   };
 
   const addToCart = async (name) => {
     const existing = cart.find(c => c.name === name);
-    if (existing) {
-      await updateDoc(doc(db, `users/${user.uid}/cart`, existing.id), { count: existing.count + 1 });
-    } else {
-      await addDoc(collection(db, `users/${user.uid}/cart`), { name, count: 1 });
-    }
+    if (existing) await updateDoc(doc(db, `users/${user.uid}/cart`, existing.id), { count: existing.count + 1 });
+    else await addDoc(collection(db, `users/${user.uid}/cart`), { name, count: 1 });
   };
 
   const checkoutCartItems = async (selectedNames) => { 
     const itemsToCheckout = cart.filter(item => selectedNames.includes(item.name));
-    
-    // 1. 냉장고로 이동
     for (const item of itemsToCheckout) {
-      let dbEntry = SHELF_LIFE_DB[item.name] || SHELF_LIFE_DB[item.name.toLowerCase()];
-      let shelfLife = 7;
+      let dbEntry = SHELF_LIFE_DB[item.name] || SHELF_LIFE_DB[item.name.toLowerCase()] || SHELF_LIFE_DB['default'];
+      let shelfLife = dbEntry.fridge || 7;
       let storage = 'fridge';
-      
-      if (dbEntry) {
-          shelfLife = dbEntry.fridge || dbEntry.pantry || dbEntry.freezer || 7;
-          if (!dbEntry.fridge && dbEntry.pantry) storage = 'pantry';
-          if (!dbEntry.fridge && !dbEntry.pantry && dbEntry.freezer) storage = 'freezer';
-      }
+      if (!dbEntry.fridge && dbEntry.freezer) storage = 'freezer';
       
       const expiry = new Date();
       expiry.setDate(expiry.getDate() + shelfLife);
 
-      // 수량만큼 반복 추가 (단순화)
       for(let i=0; i<item.count; i++) {
         await addDoc(collection(db, `users/${user.uid}/ingredients`), {
-          name: item.name,
-          category: storage,
-          expiry: expiry,
-          addedDate: new Date()
+          name: item.name, category: storage, expiry: expiry, addedDate: new Date()
         });
       }
-      // 2. 장바구니에서 삭제
       await deleteDoc(doc(db, `users/${user.uid}/cart`, item.id));
     }
     setActiveTab('list');
   };
 
-  // Risk Level Logic (수정됨: 7일 초과는 무조건 safe)
-  const getRiskLevel = (expiryDate) => {
+  // 재료별 맞춤 Risk Level Logic
+  const getRiskLevel = (expiryDate, itemName = '') => {
     const today = new Date();
     today.setHours(0,0,0,0);
     const expiry = new Date(expiryDate);
     expiry.setHours(0,0,0,0);
     
-    // 차이 일수 계산 (올림 처리하여 정확도 높임)
-    const diffTime = expiry - today;
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    const diffDays = Math.ceil((expiry - today) / (1000 * 60 * 60 * 24));
 
-    if (diffDays < 0) return 'expired'; // 이미 지남
-    if (diffDays <= 3) return 'danger'; // 0~3일 남음 (오늘 포함)
-    if (diffDays <= 7) return 'warning'; // 4~7일 남음
-    return 'safe'; // 8일 이상 남음 (초록색)
+    // DB에서 해당 재료의 설정값 가져오기 (없으면 default 사용)
+    const settings = SHELF_LIFE_DB[itemName] || SHELF_LIFE_DB[itemName.replace(/\s+/g, '')] || SHELF_LIFE_DB['default'];
+    const { danger, warning } = settings.risk || { danger: 3, warning: 7 }; // 기본값
+
+    if (diffDays < 0) return 'expired';
+    if (diffDays <= danger) return 'danger'; 
+    if (diffDays <= warning) return 'warning'; 
+    return 'safe';
   };
 
   return (
     <div className="flex flex-col h-screen bg-gray-50 font-sans max-w-md mx-auto shadow-2xl border-x overflow-hidden">
-      {/* Header */}
       <header className="bg-green-600 text-white p-4 pt-6 shadow-md z-10 flex justify-between items-center">
         <div>
           <h1 className="text-xl font-bold flex items-center gap-2"><Refrigerator /> Fresh Calendar</h1>
@@ -473,13 +374,12 @@ function AppContent({ user }) {
         </div>
       </header>
 
-      {/* Main Content */}
       <main className="flex-1 overflow-y-auto bg-gray-50 relative">
         {activeTab === 'calendar' && (
           <CalendarView 
             ingredients={ingredients} 
             getRiskLevel={getRiskLevel} 
-            onDateSelect={(date) => { setSelectedDateForAdd(date); }} // 팝업 처리는 내부에서
+            onDateSelect={(date) => { setSelectedDateForAdd(date); }}
             onAddRequest={(date) => { setSelectedDateForAdd(date); setActiveTab('add'); }}
           />
         )}
@@ -492,16 +392,14 @@ function AppContent({ user }) {
             onClose={() => setActiveTab('calendar')} 
             onAdd={addItem} 
             initialDate={selectedDateForAdd}
-            existingIngredients={ingredients}
           />
         )}
       </main>
 
-      {/* Bottom Nav */}
       <nav className="bg-white border-t flex justify-between px-6 py-3 pb-5 shadow-inner">
         <NavBtn active={activeTab==='calendar'} onClick={()=>setActiveTab('calendar')} icon={<Calendar />} label="달력" />
         <NavBtn active={activeTab==='list'} onClick={()=>setActiveTab('list')} icon={<Refrigerator />} label="냉장고" />
-        <NavBtn active={activeTab==='cart'} onClick={()=>setActiveTab('cart')} icon={<ShoppingCart />} label="카트" />
+        <NavBtn active={activeTab==='cart'} onClick={()=>setActiveTab('cart')} icon={<ShoppingCart />} label="카트" count={cart.reduce((sum, item) => sum + item.count, 0)} />
         <NavBtn active={activeTab==='recipes'} onClick={()=>setActiveTab('recipes')} icon={<ChefHat />} label="레시피" />
         <NavBtn active={activeTab==='stats'} onClick={()=>setActiveTab('stats')} icon={<BarChart2 />} label="통계" />
       </nav>
@@ -512,7 +410,7 @@ function AppContent({ user }) {
 // --- 캘린더 뷰 ---
 function CalendarView({ ingredients, getRiskLevel, onAddRequest }) {
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [selectedDayInfo, setSelectedDayInfo] = useState(null); // 팝업용 상태
+  const [selectedDayInfo, setSelectedDayInfo] = useState(null);
 
   const getDaysInMonth = (y, m) => new Date(y, m + 1, 0).getDate();
   const getFirstDayOfMonth = (y, m) => new Date(y, m, 1).getDay();
@@ -522,7 +420,6 @@ function CalendarView({ ingredients, getRiskLevel, onAddRequest }) {
   const daysInMonth = getDaysInMonth(year, month);
   const firstDay = getFirstDayOfMonth(year, month);
 
-  // 날짜별 아이템 필터링
   const getItemsForDate = (day) => ingredients.filter(i => {
     const d = new Date(i.expiry);
     return d.getDate() === day && d.getMonth() === month && d.getFullYear() === year;
@@ -530,19 +427,14 @@ function CalendarView({ ingredients, getRiskLevel, onAddRequest }) {
 
   return (
     <div className="p-4">
-      {/* 달력 헤더 */}
       <div className="flex justify-between items-center mb-6">
         <button onClick={()=>setCurrentDate(new Date(year, month-1, 1))} className="p-2"><ChevronLeft /></button>
         <h2 className="font-bold text-lg">{year}년 {month+1}월</h2>
         <button onClick={()=>setCurrentDate(new Date(year, month+1, 1))} className="p-2"><ChevronRight /></button>
       </div>
-      
-      {/* 요일 */}
       <div className="grid grid-cols-7 text-center text-xs text-gray-400 font-bold mb-2">
         {['일','월','화','수','목','금','토'].map(d=><div key={d}>{d}</div>)}
       </div>
-
-      {/* 날짜 그리드 */}
       <div className="grid grid-cols-7 gap-1">
         {Array.from({length: firstDay}).map((_, i) => <div key={`empty-${i}`} className="h-16" />)}
         {Array.from({length: daysInMonth}).map((_, i) => {
@@ -557,16 +449,14 @@ function CalendarView({ ingredients, getRiskLevel, onAddRequest }) {
               className={`h-16 border rounded-xl p-1 relative flex flex-col items-center justify-between cursor-pointer transition-colors hover:bg-green-50 ${isToday ? 'bg-green-50 border-green-400' : 'bg-white border-gray-100'}`}
             >
               <span className={`text-xs font-bold ${isToday ? 'text-green-700' : 'text-gray-600'}`}>{day}</span>
-              
-              {/* 점 표시 영역 (수정됨: flex-wrap으로 여러 개 표시) */}
               <div className="flex flex-wrap justify-center gap-1 w-full px-0.5 mb-1">
                 {dayItems.slice(0, 4).map((item, idx) => {
-                  const risk = getRiskLevel(item.expiry);
+                  const risk = getRiskLevel(item.expiry, item.name); // 이름 전달
                   return (
                     <div 
                       key={idx} 
                       className={`w-1.5 h-1.5 rounded-full ${risk === 'danger' || risk === 'expired' ? 'bg-red-500 animate-pulse' : risk === 'warning' ? 'bg-yellow-400' : 'bg-green-400'}`}
-                      style={{ animationDuration: risk === 'danger' ? '1s' : '0s' }} // 위험한 것만 깜빡임
+                      style={{ animationDuration: risk === 'danger' ? '1s' : '0s' }}
                     />
                   );
                 })}
@@ -577,7 +467,6 @@ function CalendarView({ ingredients, getRiskLevel, onAddRequest }) {
         })}
       </div>
 
-      {/* 일별 상세 팝업 (Modal) */}
       {selectedDayInfo && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-4 animate-in fade-in" onClick={() => setSelectedDayInfo(null)}>
           <div className="bg-white w-full max-w-sm rounded-2xl p-5 shadow-2xl" onClick={e => e.stopPropagation()}>
@@ -585,7 +474,6 @@ function CalendarView({ ingredients, getRiskLevel, onAddRequest }) {
               <h3 className="font-bold text-lg">{month+1}월 {selectedDayInfo.day}일 만료 목록</h3>
               <button onClick={() => setSelectedDayInfo(null)}><X className="text-gray-400" /></button>
             </div>
-            
             <div className="space-y-2 max-h-60 overflow-y-auto mb-4">
               {selectedDayInfo.items.length === 0 ? (
                 <p className="text-gray-400 text-center py-4 text-sm">만료되는 상품이 없습니다.</p>
@@ -593,7 +481,7 @@ function CalendarView({ ingredients, getRiskLevel, onAddRequest }) {
                 selectedDayInfo.items.map(item => (
                   <div key={item.id} className="flex justify-between items-center p-3 bg-gray-50 rounded-xl">
                     <div className="flex items-center gap-2">
-                      <div className={`w-2 h-2 rounded-full ${getRiskLevel(item.expiry) === 'danger' ? 'bg-red-500' : 'bg-green-400'}`} />
+                      <div className={`w-2 h-2 rounded-full ${getRiskLevel(item.expiry, item.name) === 'danger' ? 'bg-red-500' : 'bg-green-400'}`} />
                       <span className="font-bold text-gray-700">{item.name}</span>
                     </div>
                     <span className="text-xs text-gray-500 capitalize">{item.category}</span>
@@ -601,12 +489,8 @@ function CalendarView({ ingredients, getRiskLevel, onAddRequest }) {
                 ))
               )}
             </div>
-
             <button 
-              onClick={() => {
-                onAddRequest(selectedDayInfo.dateObj);
-                setSelectedDayInfo(null);
-              }}
+              onClick={() => { onAddRequest(selectedDayInfo.dateObj); setSelectedDayInfo(null); }}
               className="w-full bg-green-600 text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2"
             >
               <Plus size={18} /> 이 날짜에 추가하기
@@ -614,13 +498,6 @@ function CalendarView({ ingredients, getRiskLevel, onAddRequest }) {
           </div>
         </div>
       )}
-
-      {/* 범례 */}
-      <div className="mt-6 bg-white p-4 rounded-xl border flex justify-around text-xs text-gray-600">
-        <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse"></div>3일 이내 (위험)</div>
-        <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded-full bg-yellow-400"></div>7일 이내 (주의)</div>
-        <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded-full bg-green-400"></div>안전</div>
-      </div>
     </div>
   );
 }
@@ -633,12 +510,12 @@ function FridgeListView({ ingredients, getRiskLevel, deleteItems }) {
       <h2 className="text-lg font-bold mb-4">내 냉장고 ({ingredients.length})</h2>
       <div className="space-y-3">
         {sorted.map(item => {
-          const risk = getRiskLevel(item.expiry);
+          const risk = getRiskLevel(item.expiry, item.name); // 이름 전달
           const diff = Math.ceil((item.expiry - new Date().setHours(0,0,0,0)) / (86400000));
           return (
             <div key={item.id} className="bg-white p-4 rounded-xl border flex justify-between items-center shadow-sm">
               <div className="flex items-center gap-3">
-                <div className={`w-1.5 h-10 rounded-full ${risk === 'danger' ? 'bg-red-500' : risk === 'warning' ? 'bg-yellow-400' : 'bg-green-400'}`} />
+                <div className={`w-1.5 h-10 rounded-full ${risk === 'danger' || risk === 'expired' ? 'bg-red-500' : risk === 'warning' ? 'bg-yellow-400' : 'bg-green-400'}`} />
                 <div>
                   <h3 className="font-bold text-gray-800">{item.name}</h3>
                   <p className={`text-xs ${risk === 'danger' ? 'text-red-500 font-bold' : 'text-gray-500'}`}>
@@ -659,29 +536,24 @@ function FridgeListView({ ingredients, getRiskLevel, deleteItems }) {
 // --- 추가 모달 ---
 function AddItemModal({ onClose, onAdd, initialDate }) {
   const [name, setName] = useState('');
-  const [expiry, setExpiry] = useState(initialDate ? initialDate.toISOString().split('T')[0] : '');
+  const getInitialExpiry = () => {
+    try {
+        if (initialDate && !isNaN(initialDate.getTime())) {
+            return initialDate.toISOString().split('T')[0];
+        }
+    } catch (e) {}
+    return new Date().toISOString().split('T')[0];
+  };
+  const [expiry, setExpiry] = useState(getInitialExpiry());
   const [category, setCategory] = useState('fridge');
-  const [suggestions, setSuggestions] = useState([]);
 
-  useEffect(() => {
-    if (name) {
-      const matched = Object.keys(SHELF_LIFE_DB).filter(k => k.includes(name)).slice(0, 3);
-      setSuggestions(matched);
-    } else {
-      setSuggestions([]);
-    }
-  }, [name]);
-
-  const handleNameSelect = (selectedName) => {
-    setName(selectedName);
-    const info = SHELF_LIFE_DB[selectedName];
-    if (info) {
-       const today = new Date();
-       const shelfLife = info[category] || info['fridge'] || 7;
-       today.setDate(today.getDate() + shelfLife);
-       setExpiry(today.toISOString().split('T')[0]);
-    }
-    setSuggestions([]);
+  // 카테고리별 자동 날짜 설정 버튼
+  const setExpiryByCategory = (days, catName) => {
+    const today = new Date();
+    today.setDate(today.getDate() + days);
+    setExpiry(today.toISOString().split('T')[0]);
+    if (catName === '냉동') setCategory('freezer');
+    else setCategory('fridge');
   };
   
   const handleSubmit = (e) => {
@@ -699,16 +571,22 @@ function AddItemModal({ onClose, onAdd, initialDate }) {
       <form onSubmit={handleSubmit} className="space-y-6">
         <div>
           <label className="block text-sm font-bold text-gray-700 mb-2">이름</label>
-          <div className="relative">
-             <input value={name} onChange={e=>setName(e.target.value)} className="w-full p-4 bg-gray-50 rounded-xl border-none focus:ring-2 focus:ring-green-500" placeholder="예: 우유, 두부" autoFocus required />
-             {suggestions.length > 0 && (
-               <div className="absolute top-full left-0 right-0 bg-white shadow-lg rounded-b-xl border border-t-0 z-10">
-                 {suggestions.map(s => (
-                   <div key={s} onClick={() => handleNameSelect(s)} className="p-3 hover:bg-green-50 cursor-pointer text-sm text-gray-600 border-b last:border-0">{s}</div>
-                 ))}
-               </div>
-             )}
+          <input value={name} onChange={e=>setName(e.target.value)} className="w-full p-4 bg-gray-50 rounded-xl border-none focus:ring-2 focus:ring-green-500" placeholder="예: 삼겹살, 시금치" autoFocus required />
+        </div>
+        
+        <div>
+           <label className="block text-sm font-bold text-gray-700 mb-2">빠른 유통기한 설정</label>
+           <div className="flex gap-2 overflow-x-auto pb-1">
+             <button type="button" onClick={() => setExpiryByCategory(3, '고기')} className="px-3 py-2 bg-red-50 text-red-600 rounded-lg text-xs font-bold border border-red-100 whitespace-nowrap">🥩 고기 (3일)</button>
+             <button type="button" onClick={() => setExpiryByCategory(7, '채소')} className="px-3 py-2 bg-green-50 text-green-600 rounded-lg text-xs font-bold border border-green-100 whitespace-nowrap">🥬 채소 (7일)</button>
+             <button type="button" onClick={() => setExpiryByCategory(14, '유제품')} className="px-3 py-2 bg-yellow-50 text-yellow-600 rounded-lg text-xs font-bold border border-yellow-100 whitespace-nowrap">🥛 유제품 (14일)</button>
+             <button type="button" onClick={() => setExpiryByCategory(30, '냉동')} className="px-3 py-2 bg-blue-50 text-blue-600 rounded-lg text-xs font-bold border border-blue-100 whitespace-nowrap">❄️ 냉동 (30일)</button>
            </div>
+        </div>
+
+        <div>
+          <label className="block text-sm font-bold text-gray-700 mb-2">유통기한 (직접 수정 가능)</label>
+          <input type="date" value={expiry} onChange={e=>setExpiry(e.target.value)} className="w-full p-4 bg-gray-50 rounded-xl border-none focus:ring-2 focus:ring-green-500" required />
         </div>
         <div>
            <label className="block text-sm font-bold text-gray-700 mb-2">보관 장소</label>
@@ -718,95 +596,56 @@ function AddItemModal({ onClose, onAdd, initialDate }) {
               ))}
            </div>
         </div>
-        <div>
-          <label className="block text-sm font-bold text-gray-700 mb-2">유통기한</label>
-          <input type="date" value={expiry} onChange={e=>setExpiry(e.target.value)} className="w-full p-4 bg-gray-50 rounded-xl border-none focus:ring-2 focus:ring-green-500" required />
-        </div>
         <button className="w-full bg-green-600 text-white py-4 rounded-xl font-bold text-lg shadow-lg mt-auto">저장하기</button>
       </form>
     </div>
   );
 }
 
-// --- 장바구니 뷰 (복구됨) ---
+// --- 장바구니 뷰 ---
 function ShoppingCartView({ cart, onUpdateCount, onRemove, onCheckout }) {
   const [selectedNames, setSelectedNames] = useState([]);
-
-  useEffect(() => {
-    if (cart.length === 0) setSelectedNames([]);
-  }, [cart]);
-
   const toggleSelection = (name) => {
     if (selectedNames.includes(name)) setSelectedNames(selectedNames.filter(n => n !== name));
     else setSelectedNames([...selectedNames, name]);
   };
-
   const toggleSelectAll = () => {
     if (selectedNames.length === cart.length) setSelectedNames([]);
     else setSelectedNames(cart.map(i => i.name));
   };
 
-  const handleCheckout = () => {
-    if (selectedNames.length === 0) return;
-    onCheckout(selectedNames);
-    setSelectedNames([]);
-  };
-
-  const handleDeleteSelected = () => {
-    if (selectedNames.length === 0) return;
-    onRemove(selectedNames);
-    setSelectedNames([]);
-  };
-
   return (
     <div className="p-4 pb-20">
-      <h2 className="text-lg font-bold mb-4 flex items-center gap-2">
-        <ShoppingCart className="text-green-600" /> Shopping List
-      </h2>
+      <h2 className="text-lg font-bold mb-4 flex items-center gap-2"><ShoppingCart className="text-green-600" /> 장바구니</h2>
       {cart.length === 0 ? (
-        <div className="text-center py-20 bg-white rounded-2xl border border-dashed border-gray-300">
-          <ShoppingCart size={48} className="mx-auto mb-3 text-gray-300" />
-          <p className="text-gray-400">Your cart is empty.</p>
-        </div>
+        <div className="text-center py-20 text-gray-400">장바구니가 비었습니다.</div>
       ) : (
-        <>
-          <div className="flex items-center justify-between mb-4 bg-white p-3 rounded-xl shadow-sm border border-gray-100">
-             <button onClick={toggleSelectAll} className="flex items-center gap-2 text-sm font-medium text-gray-700">
-                {selectedNames.length === cart.length ? <CheckSquare className="text-green-600" size={20} /> : <Square className="text-gray-300" size={20} />}
-                Select All
-             </button>
-             {selectedNames.length > 0 && (
-                <button onClick={handleDeleteSelected} className="text-xs text-red-500 font-medium px-2 py-1 bg-red-50 rounded-lg">
-                   Delete ({selectedNames.length})
-                </button>
-             )}
+        <div className="space-y-3">
+          <div className="flex items-center justify-between mb-2">
+             <button onClick={toggleSelectAll} className="flex items-center gap-2 text-sm text-gray-600"><CheckSquare size={18} /> 전체 선택</button>
+             {selectedNames.length > 0 && <button onClick={()=>onRemove(selectedNames)} className="text-xs text-red-500">선택 삭제</button>}
           </div>
-          <div className="space-y-3">
-            {cart.map(item => (
-              <div key={item.name} onClick={() => toggleSelection(item.name)} className={`bg-white p-4 rounded-xl border shadow-sm flex justify-between items-center transition-all cursor-pointer ${selectedNames.includes(item.name) ? 'border-green-500 bg-green-50' : 'border-gray-100'}`}>
-                <div className="flex items-center gap-3">
-                   <div className="text-gray-400">{selectedNames.includes(item.name) ? <CheckSquare className="text-green-600" size={20} /> : <Square size={20} />}</div>
-                   <div><h3 className="font-bold text-gray-800 text-lg">{item.name}</h3><p className="text-xs text-gray-400">Qty: {item.count}</p></div>
-                </div>
-                <div className="flex items-center bg-gray-100 rounded-lg p-1" onClick={(e) => e.stopPropagation()}>
-                  <button onClick={() => onUpdateCount(item.name, -1)} className="p-1 hover:bg-white rounded-md transition-colors"><ChevronLeft size={16} /></button>
-                  <span className="w-8 text-center font-bold text-sm">{item.count}</span>
-                  <button onClick={() => onUpdateCount(item.name, 1)} className="p-1 hover:bg-white rounded-md transition-colors"><ChevronRight size={16} /></button>
-                </div>
+          {cart.map(item => (
+            <div key={item.name} className="bg-white p-4 rounded-xl border flex justify-between items-center shadow-sm">
+              <div className="flex items-center gap-3">
+                 <button onClick={()=>toggleSelection(item.name)}>{selectedNames.includes(item.name) ? <CheckSquare className="text-green-600"/> : <Square className="text-gray-300"/>}</button>
+                 <span className="font-bold">{item.name}</span>
               </div>
-            ))}
-            <div className="mt-8 p-4 bg-green-50 rounded-2xl border border-green-100 sticky bottom-20 shadow-lg">
-              <div className="flex justify-between items-center mb-4"><span className="text-gray-600 font-medium">Selected Items</span><span className="text-green-700 font-bold text-xl">{selectedNames.length}</span></div>
-              <button onClick={handleCheckout} disabled={selectedNames.length === 0} className="w-full bg-green-600 text-white py-3 rounded-xl font-bold text-lg shadow-md hover:bg-green-700 active:scale-95 transition-all flex justify-center items-center gap-2 disabled:bg-gray-300 disabled:shadow-none"><Refrigerator size={20} /> Put Selected in Fridge</button>
+              <div className="flex items-center bg-gray-100 rounded-lg">
+                <button onClick={() => onUpdateCount(item.name, -1)} className="p-1 px-2">-</button>
+                <span className="px-2 text-sm font-bold">{item.count}</span>
+                <button onClick={() => onUpdateCount(item.name, 1)} className="p-1 px-2">+</button>
+              </div>
             </div>
-          </div>
-        </>
+          ))}
+          <button onClick={()=>onCheckout(selectedNames)} disabled={selectedNames.length===0} className="w-full bg-green-600 text-white py-3 rounded-xl font-bold mt-4 disabled:bg-gray-300">선택한 재료 냉장고로 이동</button>
+        </div>
       )}
     </div>
   );
 }
 
-// --- 레시피 뷰 (복구됨) ---
+// --- 레시피 뷰 ---
 function RecipeView({ ingredients, onAddToCart, recipes }) { 
   const [selectedIngredients, setSelectedIngredients] = useState([]);
   const [selectedRecipe, setSelectedRecipe] = useState(null);
@@ -941,40 +780,20 @@ function RecipeView({ ingredients, onAddToCart, recipes }) {
   );
 }
 
-// --- 통계 뷰 (복구됨) ---
-function InsightsView({ ingredients, onAddToCart }) {
-  const getStagnantItems = () => {
-    const today = new Date();
-    return ingredients
-      .map(item => ({ ...item, daysInFridge: Math.floor((today - new Date(item.addedDate)) / (1000 * 60 * 60 * 24)) }))
-      .sort((a, b) => b.daysInFridge - a.daysInFridge)
-      .filter(item => item.daysInFridge > 14)
-      .slice(0, 3);
-  };
-  const stagnantItems = getStagnantItems();
-  const fastMovingItems = MOCK_USAGE_HISTORY;
+function InsightsView() { return <div className="p-4 text-center text-gray-500">통계 기능 준비중</div>; }
 
+// --- 하단 네비 버튼 (배지 적용) ---
+function NavBtn({ active, onClick, icon, label, count }) {
   return (
-    <div className="p-4 pb-20 space-y-6">
-      <section className="bg-white rounded-2xl p-5 shadow-sm border border-red-100">
-        <div className="flex items-center gap-2 mb-4"><div className="bg-red-100 p-2 rounded-full text-red-600"><AlertTriangle size={20} /></div><div><h2 className="font-bold text-gray-800 text-lg">Inventory Zombies</h2><p className="text-xs text-gray-500">Items sitting +14 days</p></div></div>
-        {stagnantItems.length > 0 ? (
-            <div className="space-y-3">{stagnantItems.map(item => (<div key={item.id} className="flex justify-between items-center p-3 bg-red-50 rounded-xl"><span className="font-medium text-gray-700">{item.name}</span><div className="text-right"><span className="block text-red-600 font-bold text-sm">{item.daysInFridge} days</span></div></div>))}</div>
-        ) : <div className="text-center py-4 text-gray-400 text-sm">Fridge flow is healthy!</div>}
-      </section>
-      <section className="bg-white rounded-2xl p-5 shadow-sm border border-blue-100">
-        <div className="flex items-center gap-2 mb-4"><div className="bg-blue-100 p-2 rounded-full text-blue-600"><TrendingUp size={20} /></div><div><h2 className="font-bold text-gray-800 text-lg">Top Favorites</h2><p className="text-xs text-gray-500">Restock to Cart</p></div></div>
-        <div className="space-y-3">{fastMovingItems.map((item, idx) => (<div key={idx} className="flex justify-between items-center p-3 border border-gray-100 rounded-xl hover:border-blue-200 transition-colors"><div><span className="font-medium text-gray-800 block">{item.name}</span><span className="text-[10px] text-gray-400">Consumed {item.count} times this month</span></div><button onClick={() => { onAddToCart(item.name); alert(`Added ${item.name} to Cart`); }} className="bg-blue-600 text-white p-2 rounded-lg hover:bg-blue-700 shadow-sm flex items-center gap-1 text-xs font-bold"><ShoppingCart size={14} /> Add</button></div>))}</div>
-      </section>
-    </div>
-  );
-}
-
-// --- 하단 네비 버튼 ---
-function NavBtn({ active, onClick, icon, label }) {
-  return (
-    <button onClick={onClick} className={`flex flex-col items-center gap-1 ${active ? 'text-green-600' : 'text-gray-400'}`}>
-      {React.cloneElement(icon, { size: 24, strokeWidth: active ? 2.5 : 2 })}
+    <button onClick={onClick} className={`flex flex-col items-center gap-1 relative ${active ? 'text-green-600' : 'text-gray-400'}`}>
+      <div className="relative">
+        {React.cloneElement(icon, { size: 24, strokeWidth: active ? 2.5 : 2 })}
+        {count > 0 && (
+          <span className="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-[9px] font-bold w-4 h-4 rounded-full flex items-center justify-center ring-1 ring-white">
+            {count}
+          </span>
+        )}
+      </div>
       <span className="text-[10px] font-medium">{label}</span>
     </button>
   );
