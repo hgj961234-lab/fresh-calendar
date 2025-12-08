@@ -54,22 +54,22 @@ try {
 // 기존에 가지고 계신 긴 데이터를 덮어씌워주세요.
 // ------------------------------------------------------------------
 
-// --- 유통기한 데이터베이스 (대폭 확장: 소스, 가루, 면류 포함) ---
+// --- 유통기한 및 평균 시세 데이터베이스 (단위: 원, 기준 용량 명시) ---
 const SHELF_LIFE_DB = {
-  // 김치류
-  '배추김치': { fridge: 90, freezer: 0, price: 15000, risk: { danger: 7, warning: 14 } }, // 3kg 기준
-  '부추김치': { fridge: 30, freezer: 0, price: 12000, risk: { danger: 5, warning: 10 } },
-  '파김치': { fridge: 60, freezer: 0, price: 13000, risk: { danger: 7, warning: 14 } },
-  '깍두기': { fridge: 90, freezer: 0, price: 10000, risk: { danger: 7, warning: 14 } },
-  '김치': { fridge: 90, freezer: 0, price: 10000, risk: { danger: 7, warning: 14 } }, 
+  // 김치류 (kg 단위 기준 가격으로 현실화)
+  '배추김치': { fridge: 90, freezer: 0, price: 15000, unit: '3kg', risk: { danger: 7, warning: 14 } }, 
+  '부추김치': { fridge: 30, freezer: 0, price: 12000, unit: '1kg', risk: { danger: 5, warning: 10 } },
+  '파김치': { fridge: 60, freezer: 0, price: 13000, unit: '1kg', risk: { danger: 7, warning: 14 } },
+  '깍두기': { fridge: 90, freezer: 0, price: 10000, unit: '2kg', risk: { danger: 7, warning: 14 } },
+  '김치': { fridge: 90, freezer: 0, price: 10000, unit: '1kg', risk: { danger: 7, warning: 14 } }, 
 
-  // 고기류
-  '돼지고기': { fridge: 3, freezer: 30, price: 14000, risk: { danger: 1, warning: 2 } }, // 600g
-  '소고기': { fridge: 3, freezer: 30, price: 35000, risk: { danger: 1, warning: 2 } }, // 600g (국거리/불고기 평균)
-  '닭고기': { fridge: 2, freezer: 90, price: 6500, risk: { danger: 1, warning: 2 } }, // 1마리
-  '오리훈제': { fridge: 14, freezer: 180, price: 12000, risk: { danger: 2, warning: 5 } },
-  '양고기': { fridge: 3, freezer: 180, price: 25000, risk: { danger: 1, warning: 2 } },
-  '다짐육': { fridge: 2, freezer: 30, price: 8000, risk: { danger: 1, warning: 2 } },
+  // 고기류 (600g 한 근 기준)
+  '돼지고기': { fridge: 3, freezer: 30, price: 14000, unit: '600g', risk: { danger: 1, warning: 2 } }, 
+  '소고기': { fridge: 3, freezer: 30, price: 35000, unit: '600g', risk: { danger: 1, warning: 2 } }, 
+  '닭고기': { fridge: 2, freezer: 90, price: 6500, unit: '1kg', risk: { danger: 1, warning: 2 } }, 
+  '오리훈제': { fridge: 14, freezer: 180, price: 12000, unit: '600g', risk: { danger: 2, warning: 5 } },
+  '양고기': { fridge: 3, freezer: 180, price: 25000, unit: '600g', risk: { danger: 1, warning: 2 } },
+  '다짐육': { fridge: 2, freezer: 30, price: 8000, unit: '600g', risk: { danger: 1, warning: 2 } },
 
   // 가공육 & 햄 & 통조림
   '베이컨': { fridge: 7, freezer: 30, price: 9000, risk: { danger: 2, warning: 4 } },
@@ -77,8 +77,8 @@ const SHELF_LIFE_DB = {
   '소시지': { fridge: 14, freezer: 60, price: 5000, risk: { danger: 3, warning: 7 } },
   '맛살': { fridge: 7, freezer: 0, price: 3000, risk: { danger: 2, warning: 4 } },
   '어묵': { fridge: 6, freezer: 90, price: 2500, risk: { danger: 2, warning: 4 } },
-  '참치캔': { pantry: 1095, price: 2500, risk: { danger: 30, warning: 60 } }, // NEW
-  '스팸': { pantry: 1095, price: 5000, risk: { danger: 30, warning: 60 } }, // NEW
+  '참치캔': { pantry: 1095, price: 2500, risk: { danger: 30, warning: 60 } },
+  '스팸': { pantry: 1095, price: 5000, risk: { danger: 30, warning: 60 } },
 
   // 해산물
   '고등어': { fridge: 2, freezer: 90, price: 5000, risk: { danger: 1, warning: 2 } },
@@ -93,7 +93,7 @@ const SHELF_LIFE_DB = {
 
   // 유제품 & 계란
   '우유': { fridge: 7, freezer: 30, price: 2800, risk: { danger: 2, warning: 4 } }, 
-  '달걀': { fridge: 30, freezer: 0, price: 8000, risk: { danger: 3, warning: 7 } }, // 30구
+  '달걀': { fridge: 30, freezer: 0, price: 8000, risk: { danger: 3, warning: 7 } }, 
   '요거트': { fridge: 10, freezer: 30, price: 4000, risk: { danger: 2, warning: 5 } },
   '치즈': { fridge: 20, freezer: 180, price: 5500, risk: { danger: 3, warning: 7 } },
   '모짜렐라치즈': { fridge: 7, freezer: 90, price: 11000, risk: { danger: 2, warning: 5 } },
@@ -105,7 +105,7 @@ const SHELF_LIFE_DB = {
   '순두부': { fridge: 5, freezer: 0, price: 1000, risk: { danger: 1, warning: 3 } },
   '콩나물': { fridge: 5, freezer: 0, price: 1500, risk: { danger: 1, warning: 3 } },
   '숙주': { fridge: 3, freezer: 0, price: 1500, risk: { danger: 1, warning: 2 } },
-  '양파': { fridge: 14, freezer: 180, price: 4000, risk: { danger: 3, warning: 5 } }, // 1망
+  '양파': { fridge: 14, freezer: 180, price: 4000, risk: { danger: 3, warning: 5 } }, 
   '감자': { fridge: 30, freezer: 365, price: 5000, risk: { danger: 5, warning: 10 } },
   '마늘': { fridge: 30, freezer: 365, price: 4000, risk: { danger: 5, warning: 10 } },
   '다진마늘': { fridge: 14, freezer: 180, price: 6000, risk: { danger: 3, warning: 7 } },
@@ -127,7 +127,7 @@ const SHELF_LIFE_DB = {
   '깻잎': { fridge: 5, freezer: 0, price: 1500, risk: { danger: 1, warning: 3 } },
   '상추': { fridge: 5, freezer: 0, price: 2000, risk: { danger: 1, warning: 3 } },
   '양상추': { fridge: 5, freezer: 0, price: 3000, risk: { danger: 1, warning: 3 } },
-  '아보카도': { fridge: 5, freezer: 90, price: 2500, risk: { danger: 2, warning: 4 } }, // NEW
+  '아보카도': { fridge: 5, freezer: 90, price: 2500, risk: { danger: 2, warning: 4 } },
 
   // 과일
   '사과': { fridge: 21, freezer: 0, price: 15000, risk: { danger: 3, warning: 7 } }, 
@@ -138,15 +138,15 @@ const SHELF_LIFE_DB = {
   '라임': { fridge: 21, freezer: 90, price: 1500, risk: { danger: 5, warning: 10 } },
 
   // 곡류 & 면류 & 떡
-  '밥': { fridge: 3, freezer: 30, price: 1500, risk: { danger: 1, warning: 2 } }, // 햇반 1개 기준
-  '쌀': { pantry: 365, price: 40000, risk: { danger: 30, warning: 60 } }, // 10kg
+  '밥': { fridge: 3, freezer: 30, price: 1500, risk: { danger: 1, warning: 2 } },
+  '쌀': { pantry: 365, price: 40000, risk: { danger: 30, warning: 60 } },
   '식빵': { pantry: 3, freezer: 30, price: 3500, risk: { danger: 1, warning: 2 } },
   '떡': { fridge: 3, freezer: 90, price: 4000, risk: { danger: 1, warning: 3 } },
   '소면': { pantry: 365, price: 3000, risk: { danger: 30, warning: 60 } },
   '당면': { pantry: 365, price: 4000, risk: { danger: 30, warning: 60 } },
   '파스타면': { pantry: 365, price: 3000, risk: { danger: 30, warning: 60 } },
   '우동면': { fridge: 30, freezer: 180, price: 3000, risk: { danger: 5, warning: 10 } },
-  '라면': { pantry: 180, price: 4500, risk: { danger: 14, warning: 30 } }, // 5입
+  '라면': { pantry: 180, price: 4500, risk: { danger: 14, warning: 30 } },
   '중화면': { fridge: 7, freezer: 60, price: 3000, risk: { danger: 2, warning: 4 } },
   '쌀국수': { pantry: 365, price: 3000, risk: { danger: 30, warning: 60 } },
   '또띠아': { fridge: 7, freezer: 90, price: 4000, risk: { danger: 2, warning: 5 } },
@@ -165,7 +165,7 @@ const SHELF_LIFE_DB = {
   '식초': { pantry: 365, price: 2500, risk: { danger: 30, warning: 60 } },
   '맛술': { pantry: 180, price: 3500, risk: { danger: 14, warning: 30 } },
   '참기름': { pantry: 90, price: 8000, risk: { danger: 14, warning: 30 } },
-  '들기름': { pantry: 90, price: 12000, risk: { danger: 14, warning: 30 } }, // NEW (Requested)
+  '들기름': { pantry: 90, price: 12000, risk: { danger: 14, warning: 30 } },
   '식용유': { pantry: 365, price: 5000, risk: { danger: 30, warning: 60 } },
   '올리브오일': { pantry: 365, price: 12000, risk: { danger: 30, warning: 60 } },
   '굴소스': { fridge: 180, price: 4500, risk: { danger: 14, warning: 30 } },
@@ -185,9 +185,9 @@ const SHELF_LIFE_DB = {
   '육수': { fridge: 3, freezer: 30, price: 1500, risk: { danger: 1, warning: 2 } },
   '물엿': { pantry: 365, price: 3000, risk: { danger: 30, warning: 60 } },
   '올리고당': { pantry: 365, price: 4000, risk: { danger: 30, warning: 60 } },
-   
+    
   // 기본값
-  'default': { fridge: 7, price: 3000, risk: { danger: 2, warning: 4 } }
+  'default': { fridge: 7, price: 3000, unit: '1팩', risk: { danger: 2, warning: 4 } }
 };
 
 // --- 레시피 데이터베이스 (60종 - 상세 버전 & 재료 동기화) ---
@@ -1008,9 +1008,11 @@ function AppContent({ user }) {
   const [ingredients, setIngredients] = useState([]);
   const [cart, setCart] = useState([]);
   const [trashItems, setTrashItems] = useState([]);
+  const [historyItems, setHistoryItems] = useState([]); // NEW: 사용 이력
   const [selectedDateForAdd, setSelectedDateForAdd] = useState(null);
 
   useEffect(() => {
+    // 냉장고 재료 구독
     const qIng = query(collection(db, `users/${user.uid}/ingredients`));
     const unsubIng = onSnapshot(qIng, (snap) => {
       const items = snap.docs.map(d => {
@@ -1021,16 +1023,25 @@ function AppContent({ user }) {
       checkNotifications(items); 
     });
 
+    // 장바구니 구독
     const qCart = query(collection(db, `users/${user.uid}/cart`));
     const unsubCart = onSnapshot(qCart, (snap) => setCart(snap.docs.map(d => ({...d.data(), id: d.id}))));
 
+    // 휴지통 구독
     const qTrash = query(collection(db, `users/${user.uid}/trash`));
     const unsubTrash = onSnapshot(qTrash, (snap) => {
       const items = snap.docs.map(d => ({ ...d.data(), id: d.id, deletedAt: d.data().deletedAt?.toDate() }));
       setTrashItems(items);
     });
 
-    return () => { unsubIng(); unsubCart(); unsubTrash(); };
+    // 사용 이력(History) 구독 (통계용)
+    const qHistory = query(collection(db, `users/${user.uid}/history`), orderBy('date', 'desc'));
+    const unsubHistory = onSnapshot(qHistory, (snap) => {
+        const items = snap.docs.map(d => ({ ...d.data(), id: d.id, date: d.data().date?.toDate() }));
+        setHistoryItems(items);
+    });
+
+    return () => { unsubIng(); unsubCart(); unsubTrash(); unsubHistory(); };
   }, [user]);
 
   const checkNotifications = (items) => {
@@ -1047,23 +1058,81 @@ function AppContent({ user }) {
   };
 
   const addItem = async (item) => {
-    try { await addDoc(collection(db, `users/${user.uid}/ingredients`), { ...item, addedDate: new Date(), expiry: item.expiry }); } catch (e) { alert("저장 실패: " + e.message); }
+    // price 필드 추가 (사용자 입력값 또는 DB 기본값)
+    try { await addDoc(collection(db, `users/${user.uid}/ingredients`), { ...item, addedDate: new Date(), expiry: item.expiry, price: Number(item.price) || 0 }); } catch (e) { alert("저장 실패: " + e.message); }
   };
-  
-  // --- 휴지통 기능 ---
+   
+  // 🗑️ 폐기 (휴지통 이동 + History 기록)
   const moveToTrash = async (ids) => {
     const batch = writeBatch(db);
     ids.forEach(id => {
       const item = ingredients.find(i => i.id === id);
       if (item) {
+        // 1. 실제 Trash 컬렉션 (복구용)
         const { id: itemId, ...itemData } = item;
         const trashRef = doc(collection(db, `users/${user.uid}/trash`));
         batch.set(trashRef, { ...itemData, deletedAt: new Date() });
+        
+        // 2. 통계용 History (action: 'wasted') - DB값이 아닌 개별 아이템의 저장된 price 사용
+        const historyRef = doc(collection(db, `users/${user.uid}/history`));
+        batch.set(historyRef, {
+            name: item.name,
+            action: 'wasted', // 폐기
+            price: Number(item.price) || 0, // 저장된 가격 사용
+            date: new Date()
+        });
+
+        // 3. 재료 삭제
         const ingRef = doc(db, `users/${user.uid}/ingredients`, id);
         batch.delete(ingRef);
       }
     });
     await batch.commit();
+  };
+
+  // 😋 소비 (맛있게 먹음 -> History 기록)
+  const consumeItem = async (ids) => {
+      const batch = writeBatch(db);
+      ids.forEach(id => {
+          const item = ingredients.find(i => i.id === id);
+          if (item) {
+              // 통계용 History (action: 'used') - DB값이 아닌 개별 아이템의 저장된 price 사용
+              const historyRef = doc(collection(db, `users/${user.uid}/history`));
+              batch.set(historyRef, {
+                  name: item.name,
+                  action: 'used', // 사용됨
+                  price: Number(item.price) || 0, // 저장된 가격 사용
+                  date: new Date()
+              });
+
+              // 재료 삭제
+              const ingRef = doc(db, `users/${user.uid}/ingredients`, id);
+              batch.delete(ingRef);
+          }
+      });
+      await batch.commit();
+  }
+
+  // 🔄 냉장고 초기화 기능
+  const resetFridge = async () => {
+    if (!confirm("정말 냉장고를 초기화하시겠습니까?\n모든 식재료 데이터가 영구적으로 삭제됩니다.")) return;
+    
+    // setLoading(true); // 상위 컴포넌트에 로딩 상태가 없으므로 생략하거나 로컬 상태로 처리
+    try {
+      const q = query(collection(db, `users/${user.uid}/ingredients`));
+      const snapshot = await getDocs(q);
+      const batch = writeBatch(db);
+      
+      snapshot.docs.forEach((doc) => {
+        batch.delete(doc.ref);
+      });
+      
+      await batch.commit();
+      alert("냉장고가 초기화되었습니다.");
+    } catch (e) {
+      console.error(e);
+      alert("초기화 실패: " + e.message);
+    }
   };
 
   const restoreFromTrash = async (item) => {
@@ -1109,7 +1178,7 @@ function AppContent({ user }) {
 
     itemsToCheckout.forEach(item => {
       let dbEntry = SHELF_LIFE_DB[item.name] || SHELF_LIFE_DB[item.name.toLowerCase()] || SHELF_LIFE_DB['default'];
-      if (!dbEntry) dbEntry = { fridge: 7 }; 
+      if (!dbEntry) dbEntry = { fridge: 7, price: 3000 }; 
 
       let shelfLife = dbEntry.fridge || 7;
       let storage = 'fridge';
@@ -1121,7 +1190,11 @@ function AppContent({ user }) {
       for(let i=0; i<item.count; i++) {
         const newRef = doc(collection(db, `users/${user.uid}/ingredients`));
         batch.set(newRef, {
-          name: item.name, category: storage, expiry: expiry, addedDate: new Date()
+          name: item.name, 
+          category: storage, 
+          expiry: expiry, 
+          addedDate: new Date(),
+          price: dbEntry.price || 0 // 장바구니에서 추가 시 기본 가격 적용
         });
       }
       const cartRef = doc(db, `users/${user.uid}/cart`, item.id);
@@ -1154,6 +1227,8 @@ function AppContent({ user }) {
       <header className="bg-green-600 text-white p-4 pt-6 shadow-md z-10 flex justify-between items-center">
         <div><h1 className="text-xl font-bold flex items-center gap-2"><Refrigerator /> Fresh Calendar</h1><p className="text-green-100 text-xs mt-1 truncate max-w-[150px]">{user.email}</p></div>
         <div className="flex gap-2">
+          {/* 초기화 버튼 추가 */}
+          <button onClick={resetFridge} className="p-2 bg-green-700 rounded-full hover:bg-red-600 transition-colors" title="냉장고 초기화"><RefreshCcw size={18} /></button>
           <button onClick={requestNotiPermission} className="p-2 bg-green-700 rounded-full hover:bg-green-800"><Bell size={18} /></button>
           <button onClick={() => signOut(auth)} className="p-2 bg-green-700 rounded-full hover:bg-green-800"><LogOut size={18} /></button>
           <button onClick={() => { setSelectedDateForAdd(new Date()); setActiveTab('add'); }} className="bg-white text-green-600 p-2 rounded-full hover:bg-green-50"><Plus size={18} /></button>
@@ -1162,11 +1237,11 @@ function AppContent({ user }) {
 
       <main className="flex-1 overflow-y-auto bg-gray-50 relative">
         {activeTab === 'calendar' && <CalendarView ingredients={ingredients} getRiskLevel={getRiskLevel} onDateSelect={(date) => { setSelectedDateForAdd(date); }} onAddRequest={(date) => { setSelectedDateForAdd(date); setActiveTab('add'); }} />}
-        {activeTab === 'list' && <FridgeListView ingredients={ingredients} getRiskLevel={getRiskLevel} moveToTrash={moveToTrash} updateItemExpiry={updateItemExpiry} onOpenTrash={() => setActiveTab('trash')} />}
+        {activeTab === 'list' && <FridgeListView ingredients={ingredients} getRiskLevel={getRiskLevel} moveToTrash={moveToTrash} consumeItem={consumeItem} updateItemExpiry={updateItemExpiry} onOpenTrash={() => setActiveTab('trash')} />}
         {activeTab === 'trash' && <TrashView trashItems={trashItems} onRestore={restoreFromTrash} onPermanentDelete={permanentDelete} onClose={() => setActiveTab('list')} />}
-        {activeTab === 'recipes' && <RecipeView ingredients={ingredients} onAddToCart={addToCart} recipes={RECIPE_FULL_DB} />}
+        {activeTab === 'recipes' && <RecipeView ingredients={ingredients} onAddToCart={addToCart} />}
         {activeTab === 'cart' && <ShoppingCartView cart={cart} onUpdateCount={updateCartCount} onRemove={removeItemsFromCart} onCheckout={checkoutCartItems} />}
-        {activeTab === 'stats' && <InsightsView ingredients={ingredients} onAddToCart={addToCart} history={MOCK_USAGE_HISTORY} />}
+        {activeTab === 'stats' && <InsightsView ingredients={ingredients} onAddToCart={addToCart} history={historyItems} />}
         {activeTab === 'add' && <AddItemModal onClose={() => setActiveTab('calendar')} onAdd={addItem} initialDate={selectedDateForAdd} />}
       </main>
 
@@ -1248,8 +1323,8 @@ function CalendarView({ ingredients, getRiskLevel, onAddRequest }) {
   );
 }
 
-// --- 냉장고 목록 뷰 (선택 삭제 버그 수정됨) ---
-function FridgeListView({ ingredients, getRiskLevel, moveToTrash, updateItemExpiry, onOpenTrash }) {
+// --- 냉장고 목록 뷰 (소비 vs 폐기 분리) ---
+function FridgeListView({ ingredients, getRiskLevel, moveToTrash, consumeItem, updateItemExpiry, onOpenTrash }) {
   const sorted = [...ingredients].sort((a,b) => (a.expiry || 0) - (b.expiry || 0));
   const [editingItem, setEditingItem] = useState(null);
   const [selectedIds, setSelectedIds] = useState([]);
@@ -1264,13 +1339,19 @@ function FridgeListView({ ingredients, getRiskLevel, moveToTrash, updateItemExpi
     else setSelectedIds(ingredients.map(i => i.id));
   };
 
-  const handleDeleteSelected = (e) => {
+  const handleWasteSelected = (e) => {
     e.stopPropagation();
-    // confirm()을 제거하여 휴지통으로 즉시 이동 (iframe에서 confirm 차단 문제 해결)
     if (selectedIds.length === 0) return;
     moveToTrash(selectedIds);
     setSelectedIds([]);
   };
+
+  const handleConsumeSelected = (e) => {
+      e.stopPropagation();
+      if (selectedIds.length === 0) return;
+      consumeItem(selectedIds);
+      setSelectedIds([]);
+  }
 
   const EditModal = () => {
     if (!editingItem) return null;
@@ -1307,12 +1388,17 @@ function FridgeListView({ ingredients, getRiskLevel, moveToTrash, updateItemExpi
             전체 선택
         </button>
         {selectedIds.length > 0 && (
-          <button onClick={handleDeleteSelected} className="text-xs bg-red-50 text-red-600 px-3 py-2 rounded-xl font-bold border border-red-100 shadow-sm animate-in zoom-in duration-200 flex-1 cursor-pointer hover:bg-red-100">
-            {selectedIds.length}개 삭제 (휴지통)
-          </button>
+          <>
+            <button onClick={handleConsumeSelected} className="text-xs bg-green-50 text-green-600 px-3 py-2 rounded-xl font-bold border border-green-100 shadow-sm animate-in zoom-in duration-200 flex-1 cursor-pointer hover:bg-green-100 flex items-center justify-center gap-1">
+              <Utensils size={14} /> 사용 (먹음)
+            </button>
+            <button onClick={handleWasteSelected} className="text-xs bg-red-50 text-red-600 px-3 py-2 rounded-xl font-bold border border-red-100 shadow-sm animate-in zoom-in duration-200 flex-1 cursor-pointer hover:bg-red-100 flex items-center justify-center gap-1">
+              <Trash2 size={14} /> 폐기 (버림)
+            </button>
+          </>
         )}
       </div>
-      
+       
       <div className="space-y-3">
         {sorted.map(item => {
           const risk = getRiskLevel(item.expiry, item.name);
@@ -1328,12 +1414,16 @@ function FridgeListView({ ingredients, getRiskLevel, moveToTrash, updateItemExpi
                 <div className={`w-1.5 h-10 rounded-full ${risk === 'danger' ? 'bg-red-500' : risk === 'warning' ? 'bg-yellow-400' : 'bg-green-400'}`} />
                 <div>
                   <h3 className="font-bold text-gray-800">{item.name}</h3>
+                  {/* 가격 표시 추가 */}
+                  <p className="text-xs text-gray-400 font-medium">{item.price ? `${new Intl.NumberFormat('ko-KR').format(item.price)}원` : '가격 미입력'}</p>
                   <p className={`text-xs ${risk === 'danger' ? 'text-red-500 font-bold' : 'text-gray-500'}`}>{diff < 0 ? '만료됨' : diff === 0 ? '오늘 만료' : `${diff}일 남음`} ({item.expiry ? item.expiry.toLocaleDateString() : '?'})</p>
                 </div>
               </div>
               <div className="flex gap-2">
                 <button onClick={(e) => { e.stopPropagation(); setEditingItem(item); }} className="text-gray-300 hover:text-green-600 p-2"><Edit2 size={18} /></button>
-                <button onClick={(e) => { e.stopPropagation(); moveToTrash([item.id]); }} className="text-gray-300 hover:text-red-500 p-2"><Trash2 size={18} /></button>
+                {/* 개별 아이템 액션 */}
+                <button onClick={(e) => { e.stopPropagation(); consumeItem([item.id]); }} className="text-green-200 hover:text-green-600 p-2" title="사용/먹음"><Utensils size={18} /></button>
+                <button onClick={(e) => { e.stopPropagation(); moveToTrash([item.id]); }} className="text-red-200 hover:text-red-500 p-2" title="폐기/버림"><Trash2 size={18} /></button>
               </div>
             </div>
           );
@@ -1380,26 +1470,53 @@ function TrashView({ trashItems, onRestore, onPermanentDelete, onClose }) {
   );
 }
 
-// --- 추가 모달 ---
+// ... AddItemModal (가격 입력 추가) ...
 function AddItemModal({ onClose, onAdd, initialDate }) {
   const [name, setName] = useState('');
+  const [price, setPrice] = useState(''); // 가격 상태 추가
   const getInitialExpiry = () => { try { if (initialDate && !isNaN(initialDate.getTime())) return initialDate.toISOString().split('T')[0]; } catch(e){} return new Date().toISOString().split('T')[0]; };
   const [expiry, setExpiry] = useState(getInitialExpiry());
   const [category, setCategory] = useState('fridge');
+
+  // 이름 입력 시 DB에서 기본 가격 가져오기
+  useEffect(() => {
+    if (name) {
+      const dbEntry = SHELF_LIFE_DB[name] || SHELF_LIFE_DB[name.replace(/\s+/g, '')];
+      if (dbEntry && dbEntry.price) {
+        setPrice(dbEntry.price);
+      }
+    }
+  }, [name]);
 
   const setExpiryByCategory = (days, catName) => {
     const today = new Date(); today.setDate(today.getDate() + days);
     setExpiry(today.toISOString().split('T')[0]);
     if (catName === '냉동') setCategory('freezer'); else setCategory('fridge');
   };
-  
-  const handleSubmit = (e) => { e.preventDefault(); onAdd({ name, expiry: new Date(expiry), category }); onClose(); };
+   
+  const handleSubmit = (e) => { 
+    e.preventDefault(); 
+    // 가격 정보를 포함하여 추가
+    onAdd({ name, expiry: new Date(expiry), category, price: Number(price) }); 
+    onClose(); 
+  };
 
   return (
     <div className="absolute inset-0 bg-white z-20 flex flex-col p-6 animate-in slide-in-from-bottom-10">
       <div className="flex items-center gap-2 mb-6"><button onClick={onClose}><ArrowLeft /></button><h2 className="text-lg font-bold">새 식재료 추가</h2></div>
       <form onSubmit={handleSubmit} className="space-y-6">
         <div><label className="block text-sm font-bold text-gray-700 mb-2">이름</label><input value={name} onChange={e=>setName(e.target.value)} className="w-full p-4 bg-gray-50 rounded-xl border-none focus:ring-2 focus:ring-green-500" placeholder="예: 삼겹살, 시금치" autoFocus required /></div>
+        
+        {/* 가격 입력 필드 추가 */}
+        <div>
+          <label className="block text-sm font-bold text-gray-700 mb-2">구매 가격 (원)</label>
+          <div className="relative">
+            <input type="number" value={price} onChange={e=>setPrice(e.target.value)} className="w-full p-4 bg-gray-50 rounded-xl border-none focus:ring-2 focus:ring-green-500 pl-8" placeholder="예: 15000" />
+            <span className="absolute left-3 top-4 text-gray-400">₩</span>
+          </div>
+          <p className="text-xs text-gray-400 mt-1 ml-1">* 용량에 상관없이 실제 구매한 금액을 입력하세요.</p>
+        </div>
+
         <div><label className="block text-sm font-bold text-gray-700 mb-2">빠른 설정</label><div className="flex gap-2 overflow-x-auto pb-1"><button type="button" onClick={() => setExpiryByCategory(3, '고기')} className="px-3 py-2 bg-red-50 text-red-600 rounded-lg text-xs font-bold border border-red-100 whitespace-nowrap">🥩 고기 (3일)</button><button type="button" onClick={() => setExpiryByCategory(7, '채소')} className="px-3 py-2 bg-green-50 text-green-600 rounded-lg text-xs font-bold border border-green-100 whitespace-nowrap">🥬 채소 (7일)</button><button type="button" onClick={() => setExpiryByCategory(90, '김치')} className="px-3 py-2 bg-red-100 text-red-700 rounded-lg text-xs font-bold border border-red-200 whitespace-nowrap">🌶️ 김치 (90일)</button><button type="button" onClick={() => setExpiryByCategory(14, '유제품')} className="px-3 py-2 bg-yellow-50 text-yellow-600 rounded-lg text-xs font-bold border border-yellow-100 whitespace-nowrap">🥛 유제품 (14일)</button><button type="button" onClick={() => setExpiryByCategory(30, '냉동')} className="px-3 py-2 bg-blue-50 text-blue-600 rounded-lg text-xs font-bold border border-blue-100 whitespace-nowrap">❄️ 냉동 (30일)</button></div></div>
         <div><label className="block text-sm font-bold text-gray-700 mb-2">유통기한</label><input type="date" value={expiry} onChange={e=>setExpiry(e.target.value)} className="w-full p-4 bg-gray-50 rounded-xl border-none focus:ring-2 focus:ring-green-500" required /></div>
         <div><label className="block text-sm font-bold text-gray-700 mb-2">보관 장소</label><div className="flex gap-3">{['fridge', 'freezer', 'pantry'].map(c => (<button type="button" key={c} onClick={() => setCategory(c)} className={`flex-1 py-3 rounded-xl capitalize font-bold transition-all ${category === c ? 'bg-green-100 text-green-700 ring-2 ring-green-500' : 'bg-gray-100 text-gray-400'}`}>{c}</button>))}</div></div>
@@ -1492,26 +1609,25 @@ function RecipeView({ ingredients, onAddToCart, recipes }) {
   );
 }
 
-// --- 통계 뷰 ---
+// --- NEW: 실제 데이터 기반 통계 뷰 ---
 function InsightsView({ ingredients, onAddToCart, history }) {
-  const usageHistory = history && history.length > 0 ? history : [];
-  const maxCount = usageHistory.length > 0 ? Math.max(...usageHistory.map(h => h.count)) : 1;
-  const handleQuickAdd = (name) => { onAddToCart(name); alert(`${name}이(가) 장바구니에 담겼습니다!`); };
+  // 1. 소비(Used)된 금액 총액 계산
+  const totalUsed = history.filter(h => h.action === 'used').reduce((sum, item) => sum + (item.price || 0), 0);
+  
+  // 2. 폐기(Wasted)된 금액 총액 계산
+  const totalWasted = history.filter(h => h.action === 'wasted').reduce((sum, item) => sum + (item.price || 0), 0);
 
-  // --- 💰 비용 절약 계산 로직 ---
-  // 1. 재료비 총액 계산 (사용 이력 기준)
-  const totalIngredientCost = usageHistory.reduce((sum, item) => {
-    // DB에서 가격 정보 가져오기 (없으면 기본값 3000원)
-    const itemInfo = SHELF_LIFE_DB[item.name] || SHELF_LIFE_DB['default'];
-    const price = itemInfo.price || 3000; 
-    return sum + (price * item.count);
-  }, 0);
+  // 3. 순수 절약 금액 계산: (사용 금액 * 60%) - 폐기 금액
+  const rawSavings = Math.round(totalUsed * 0.6);
+  const netSavings = rawSavings - totalWasted;
 
-  // 2. 외식비 추정 (일반적인 식당 원가율 30~35% 적용 -> 재료비의 약 3배)
-  const estimatedRestaurantCost = totalIngredientCost * 3;
-
-  // 3. 절약한 금액
-  const totalSaved = estimatedRestaurantCost - totalIngredientCost;
+  // 4. 자주 쓰는 재료 랭킹 (Used 기준)
+  const usageCounts = history.filter(h => h.action === 'used').reduce((acc, item) => {
+      acc[item.name] = (acc[item.name] || 0) + 1;
+      return acc;
+  }, {});
+  const rankedItems = Object.entries(usageCounts).sort(([,a], [,b]) => b - a).slice(0, 5);
+  const maxCount = rankedItems.length > 0 ? rankedItems[0][1] : 1;
 
   // 숫자 포맷팅 (예: 12,000)
   const formatMoney = (amount) => new Intl.NumberFormat('ko-KR').format(amount);
@@ -1521,22 +1637,22 @@ function InsightsView({ ingredients, onAddToCart, history }) {
       <h2 className="text-lg font-bold mb-4 flex items-center gap-2"><BarChart2 className="text-green-600" /> 통계 및 분석</h2>
       
       {/* 절약 금액 카드 (메인) */}
-      <div className="bg-gradient-to-br from-green-500 to-green-700 p-6 rounded-3xl shadow-lg mb-6 text-white relative overflow-hidden">
+      <div className={`p-6 rounded-3xl shadow-lg mb-6 text-white relative overflow-hidden transition-colors ${netSavings >= 0 ? 'bg-gradient-to-br from-green-500 to-green-700' : 'bg-gradient-to-br from-red-500 to-red-700'}`}>
         <div className="absolute top-0 right-0 p-8 opacity-10"><DollarSign size={100} /></div>
         <div className="relative z-10">
-          <h3 className="font-medium text-green-100 mb-1 flex items-center gap-2">이번 달 집밥으로 아낀 돈</h3>
+          <h3 className="font-medium text-green-100 mb-1 flex items-center gap-2">이번 달 집밥 순수 절약액</h3>
           <div className="text-4xl font-bold mb-4 flex items-baseline gap-1">
-            {formatMoney(totalSaved)}<span className="text-lg font-normal">원</span>
+            {formatMoney(netSavings)}<span className="text-lg font-normal">원</span>
           </div>
           
-          <div className="bg-white/20 rounded-xl p-3 backdrop-blur-sm text-sm flex justify-between items-center">
-             <div>
-               <div className="text-green-100 text-xs">외식했을 때 예상 비용</div>
-               <div className="font-bold">{formatMoney(estimatedRestaurantCost)}원</div>
+          <div className="bg-white/20 rounded-xl p-3 backdrop-blur-sm text-sm space-y-2">
+             <div className="flex justify-between items-center">
+               <div className="text-green-100 text-xs flex items-center gap-1"><Utensils size={12}/> 식재료 사용 가치 (절약분 60%)</div>
+               <div className="font-bold">+{formatMoney(rawSavings)}원</div>
              </div>
-             <div className="text-right">
-               <div className="text-green-100 text-xs">실제 재료비</div>
-               <div className="font-bold">-{formatMoney(totalIngredientCost)}원</div>
+             <div className="flex justify-between items-center text-red-100">
+               <div className="text-xs flex items-center gap-1"><Trash2 size={12}/> 폐기된 식재료 손실</div>
+               <div className="font-bold">-{formatMoney(totalWasted)}원</div>
              </div>
           </div>
         </div>
@@ -1545,27 +1661,26 @@ function InsightsView({ ingredients, onAddToCart, history }) {
       <div className="bg-white p-5 rounded-2xl border shadow-sm mb-4">
         <h3 className="text-sm font-bold text-gray-500 mb-3 flex items-center gap-1"><PieChart size={14} /> 현재 냉장고 상태</h3>
         <div className="flex items-center justify-between">
-            <div className="text-center"><div className="text-2xl font-bold text-green-600">{ingredients.length}</div><div className="text-xs text-gray-400">총 식재료</div></div>
+            <div className="text-center"><div className="text-2xl font-bold text-green-600">{ingredients.length}</div><div className="text-xs text-gray-400">보관 중</div></div>
             <div className="h-8 w-[1px] bg-gray-200"></div>
-            <div className="text-center"><div className="text-2xl font-bold text-gray-800">100<span className="text-xs text-gray-400">%</span></div><div className="text-xs text-gray-400">신선도</div></div>
+            <div className="text-center"><div className="text-2xl font-bold text-blue-500">{history.filter(h=>h.action==='used').length}</div><div className="text-xs text-gray-400">누적 소비</div></div>
             <div className="h-8 w-[1px] bg-gray-200"></div>
-            <div className="text-center"><div className="text-2xl font-bold text-blue-500">0</div><div className="text-xs text-gray-400">폐기율</div></div>
+            <div className="text-center"><div className="text-2xl font-bold text-red-500">{history.filter(h=>h.action==='wasted').length}</div><div className="text-xs text-gray-400">누적 폐기</div></div>
         </div>
       </div>
 
       <div className="bg-white p-5 rounded-2xl border shadow-sm mb-4">
-        <h3 className="text-sm font-bold text-gray-500 mb-4 flex items-center gap-1"><TrendingUp size={14} /> 자주 쓰는 재료 Top 5</h3>
+        <h3 className="text-sm font-bold text-gray-500 mb-4 flex items-center gap-1"><TrendingUp size={14} /> 자주 먹은 식재료 Top 5</h3>
         <div className="space-y-4">
-          {usageHistory.length > 0 ? usageHistory.map((item, idx) => (
+          {rankedItems.length > 0 ? rankedItems.map(([name, count], idx) => (
             <div key={idx} className="group">
               <div className="flex justify-between items-center text-xs mb-1">
-                <span className="font-bold text-gray-700">{item.name}</span>
-                <div className="flex items-center gap-2"><span className="text-gray-400">{item.count}회 구매</span><button onClick={() => handleQuickAdd(item.name)} className="bg-green-50 text-green-600 p-1 rounded hover:bg-green-100 transition-colors" title="장바구니에 담기"><Plus size={12} /></button></div>
+                <span className="font-bold text-gray-700">{name}</span>
+                <div className="flex items-center gap-2"><span className="text-gray-400">{count}회 사용</span><button onClick={() => { onAddToCart(name); alert("카트에 추가됨"); }} className="bg-green-50 text-green-600 p-1 rounded hover:bg-green-100 transition-colors" title="장바구니에 담기"><Plus size={12} /></button></div>
               </div>
-              <div className="w-full bg-gray-100 rounded-full h-2"><div className="bg-green-500 h-2 rounded-full transition-all duration-1000" style={{ width: `${(item.count / maxCount) * 100}%` }}></div></div>
-              <div className="text-[10px] text-gray-400 mt-1 text-right">평균 {item.avgDays}일 만에 소진</div>
+              <div className="w-full bg-gray-100 rounded-full h-2"><div className="bg-green-500 h-2 rounded-full transition-all duration-1000" style={{ width: `${(count / maxCount) * 100}%` }}></div></div>
             </div>
-          )) : <div className="text-center text-gray-400 text-xs py-4">데이터가 부족합니다.</div>}
+          )) : <div className="text-center text-gray-400 text-xs py-4">아직 사용 기록이 없습니다.<br/>냉장고에서 '사용' 버튼을 눌러보세요.</div>}
         </div>
       </div>
     </div>
