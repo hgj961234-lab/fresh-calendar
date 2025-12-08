@@ -3,7 +3,8 @@ import {
   Calendar, Plus, ChefHat, Refrigerator, ChevronLeft, ChevronRight, AlertCircle, 
   Check, X, Search, Clock, ArrowRight, Trash2, RefreshCcw, CheckSquare, Square, 
   BarChart2, TrendingUp, AlertTriangle, ShoppingCart, Edit2, Snowflake, Archive, 
-  BookOpen, ArrowLeft, Users, LogOut, Loader, Bell, PieChart, DollarSign, Undo2
+  BookOpen, ArrowLeft, Users, LogOut, Loader, Bell, PieChart, DollarSign, Undo2,
+  Utensils // 👈 여기에 Utensils가 추가되었습니다.
 } from 'lucide-react';
 
 // --- FIREBASE IMPORTS ---
@@ -24,7 +25,9 @@ import {
   doc, 
   onSnapshot, 
   query,
-  writeBatch
+  writeBatch,
+  getDocs,    // 👈 여기에 getDocs가 추가되었습니다.
+  orderBy     // 👈 (추가 권장) history 쿼리에서 orderBy를 쓰고 있으므로 이것도 필요합니다.
 } from "firebase/firestore";
 
 // ⚠️ 사용자 제공 Firebase 설정값
