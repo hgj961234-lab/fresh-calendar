@@ -1115,6 +1115,32 @@ function AppContent({ user }) {
       });
       await batch.commit();
   }
+// 📊 통계(기록) 초기화 함수 (새로 추가)
+const resetHistory = async () => {
+  if (!confirm("정말 통계 기록을 초기화하시겠습니까?\n누적된 사용/폐기 금액과 횟수가 모두 0으로 됩니다.\n(냉장고 속 식재료는 삭제되지 않습니다.)")) return;
+  
+  try {
+    const q = query(collection(db, `users/${user.uid}/history`));
+    const snapshot = await getDocs(q);
+    
+    // 기록이 없으면 알림
+    if (snapshot.empty) {
+      alert("삭제할 기록이 없습니다.");
+      return;
+    }
+
+    const batch = writeBatch(db);
+    snapshot.docs.forEach((doc) => {
+      batch.delete(doc.ref);
+    });
+    
+    await batch.commit();
+    alert("통계 기록이 초기화되었습니다. 이번 달도 알뜰하게 시작해보세요!");
+  } catch (e) {
+    console.error(e);
+    alert("초기화 실패: " + e.message);
+  }
+};
 
   // 🔄 냉장고 초기화 기능
   const resetFridge = async () => {
@@ -1244,7 +1270,8 @@ function AppContent({ user }) {
         {activeTab === 'trash' && <TrashView trashItems={trashItems} onRestore={restoreFromTrash} onPermanentDelete={permanentDelete} onClose={() => setActiveTab('list')} />}
         {activeTab === 'recipes' && <RecipeView ingredients={ingredients} onAddToCart={addToCart} />}
         {activeTab === 'cart' && <ShoppingCartView cart={cart} onUpdateCount={updateCartCount} onRemove={removeItemsFromCart} onCheckout={checkoutCartItems} />}
-        {activeTab === 'stats' && <InsightsView ingredients={ingredients} onAddToCart={addToCart} history={historyItems} />}
+        {activeTab === 'stats' && (<InsightsView ingredients={ingredients} onAddToCart={addToCart} history={historyItems} onResetHistory={resetHistory} // 👈 이 줄을 추가해서 함수를 전달합니다!
+/>)}
         {activeTab === 'add' && <AddItemModal onClose={() => setActiveTab('calendar')} onAdd={addItem} initialDate={selectedDateForAdd} />}
       </main>
 
@@ -1409,17 +1436,32 @@ function FridgeListView({ ingredients, getRiskLevel, moveToTrash, consumeItem, u
           const isSelected = selectedIds.includes(item.id);
 
           return (
-            <div key={item.id} className={`p-4 rounded-xl border flex justify-between items-center shadow-sm transition-all duration-200 ${isSelected ? 'bg-green-50 border-green-300 ring-1 ring-green-500' : 'bg-white border-gray-100'}`}>
+            <div key={item.id} className={`... (생략) ...`}>
               <div className="flex items-center gap-3 flex-1 cursor-pointer" onClick={() => toggleSelect(item.id)}>
-                <div className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${isSelected ? 'bg-green-500 border-green-500' : 'border-gray-300 bg-white'}`}>
-                    {isSelected && <Check size={14} className="text-white" />}
-                </div>
-                <div className={`w-1.5 h-10 rounded-full ${risk === 'danger' ? 'bg-red-500' : risk === 'warning' ? 'bg-yellow-400' : 'bg-green-400'}`} />
+                {/* ... (체크박스, 색깔 띠 부분 생략) ... */}
+                
+                {/* 🔻 [여기입니다!] 이 부분을 수정하세요 🔻 */}
                 <div>
-                  <h3 className="font-bold text-gray-800">{item.name}</h3>
-                  {/* 가격 표시 추가 */}
-                  <p className="text-xs text-gray-400 font-medium">{item.price ? `${new Intl.NumberFormat('ko-KR').format(item.price)}원` : '가격 미입력'}</p>
-                  <p className={`text-xs ${risk === 'danger' ? 'text-red-500 font-bold' : 'text-gray-500'}`}>{diff < 0 ? '만료됨' : diff === 0 ? '오늘 만료' : `${diff}일 남음`} ({item.expiry ? item.expiry.toLocaleDateString() : '?'})</p>
+                  <h3 className="font-bold text-gray-800 flex items-center gap-1">
+                    {item.name}
+                    {/* 👇 그람(g)수 표시 코드 추가됨 👇 */}
+                    {item.amount > 0 && (
+                      <span className="text-sm font-normal text-green-600">
+                        ({item.amount}{item.unit || 'g'})
+                      </span>
+                    )}
+                  </h3>
+                  
+                  {/* 가격 표시 */}
+                  <p className="text-xs text-gray-400 font-medium">
+                    {item.price ? `${new Intl.NumberFormat('ko-KR').format(item.price)}원` : '가격 미입력'}
+                  </p>
+                  
+                  {/* 날짜 표시 */}
+                  <p className={`text-xs ${risk === 'danger' ? 'text-red-500 font-bold' : 'text-gray-500'}`}>
+                    {diff < 0 ? '만료됨' : diff === 0 ? '오늘 만료' : `${diff}일 남음`} 
+                    ({item.expiry ? item.expiry.toLocaleDateString() : '?'})
+                  </p>
                 </div>
               </div>
               <div className="flex gap-2">
@@ -1473,58 +1515,62 @@ function TrashView({ trashItems, onRestore, onPermanentDelete, onClose }) {
   );
 }
 
-// ... AddItemModal (가격 입력 추가) ...
+// --- AddItemModal 수정 ---
 function AddItemModal({ onClose, onAdd, initialDate }) {
-  const [name, setName] = useState('');
-  const [price, setPrice] = useState(''); // 가격 상태 추가
-  const getInitialExpiry = () => { try { if (initialDate && !isNaN(initialDate.getTime())) return initialDate.toISOString().split('T')[0]; } catch(e){} return new Date().toISOString().split('T')[0]; };
-  const [expiry, setExpiry] = useState(getInitialExpiry());
-  const [category, setCategory] = useState('fridge');
+  // ... 기존 state들 ...
+  const [amount, setAmount] = useState(''); // 👈 용량 입력용 상태 추가
+  const [unit, setUnit] = useState('g');    // 👈 단위 (g, ml, 개 등)
 
-  // 이름 입력 시 DB에서 기본 가격 가져오기
-  useEffect(() => {
-    if (name) {
-      const dbEntry = SHELF_LIFE_DB[name] || SHELF_LIFE_DB[name.replace(/\s+/g, '')];
-      if (dbEntry && dbEntry.price) {
-        setPrice(dbEntry.price);
-      }
-    }
-  }, [name]);
+  // ... (기존 useEffect 등) ...
 
-  const setExpiryByCategory = (days, catName) => {
-    const today = new Date(); today.setDate(today.getDate() + days);
-    setExpiry(today.toISOString().split('T')[0]);
-    if (catName === '냉동') setCategory('freezer'); else setCategory('fridge');
-  };
-   
   const handleSubmit = (e) => { 
     e.preventDefault(); 
-    // 가격 정보를 포함하여 추가
-    onAdd({ name, expiry: new Date(expiry), category, price: Number(price) }); 
+    // 저장할 때 amount와 unit도 같이 저장하도록 수정
+    onAdd({ 
+      name, 
+      expiry: new Date(expiry), 
+      category, 
+      price: Number(price),
+      amount: Number(amount) || 0, // 👈 추가됨
+      unit: unit                   // 👈 추가됨
+    }); 
     onClose(); 
   };
 
   return (
-    <div className="absolute inset-0 bg-white z-20 flex flex-col p-6 animate-in slide-in-from-bottom-10">
-      <div className="flex items-center gap-2 mb-6"><button onClick={onClose}><ArrowLeft /></button><h2 className="text-lg font-bold">새 식재료 추가</h2></div>
-      <form onSubmit={handleSubmit} className="space-y-6">
-        <div><label className="block text-sm font-bold text-gray-700 mb-2">이름</label><input value={name} onChange={e=>setName(e.target.value)} className="w-full p-4 bg-gray-50 rounded-xl border-none focus:ring-2 focus:ring-green-500" placeholder="예: 삼겹살, 시금치" autoFocus required /></div>
-        
-        {/* 가격 입력 필드 추가 */}
-        <div>
-          <label className="block text-sm font-bold text-gray-700 mb-2">구매 가격 (원)</label>
-          <div className="relative">
-            <input type="number" value={price} onChange={e=>setPrice(e.target.value)} className="w-full p-4 bg-gray-50 rounded-xl border-none focus:ring-2 focus:ring-green-500 pl-8" placeholder="예: 15000" />
-            <span className="absolute left-3 top-4 text-gray-400">₩</span>
-          </div>
-          <p className="text-xs text-gray-400 mt-1 ml-1">* 용량에 상관없이 실제 구매한 금액을 입력하세요.</p>
+    <div className="...">
+      {/* ... 이름 입력 필드 ... */}
+      
+      {/* 👇 [추가] 용량/무게 입력 필드 👇 */}
+      <div className="flex gap-2">
+        <div className="flex-1">
+          <label className="block text-sm font-bold text-gray-700 mb-2">용량/수량</label>
+          <input 
+            type="number" 
+            value={amount} 
+            onChange={e=>setAmount(e.target.value)} 
+            className="w-full p-4 bg-gray-50 rounded-xl border-none focus:ring-2 focus:ring-green-500" 
+            placeholder="예: 600" 
+          />
         </div>
-
-        <div><label className="block text-sm font-bold text-gray-700 mb-2">빠른 설정</label><div className="flex gap-2 overflow-x-auto pb-1"><button type="button" onClick={() => setExpiryByCategory(3, '고기')} className="px-3 py-2 bg-red-50 text-red-600 rounded-lg text-xs font-bold border border-red-100 whitespace-nowrap">🥩 고기 (3일)</button><button type="button" onClick={() => setExpiryByCategory(7, '채소')} className="px-3 py-2 bg-green-50 text-green-600 rounded-lg text-xs font-bold border border-green-100 whitespace-nowrap">🥬 채소 (7일)</button><button type="button" onClick={() => setExpiryByCategory(90, '김치')} className="px-3 py-2 bg-red-100 text-red-700 rounded-lg text-xs font-bold border border-red-200 whitespace-nowrap">🌶️ 김치 (90일)</button><button type="button" onClick={() => setExpiryByCategory(14, '유제품')} className="px-3 py-2 bg-yellow-50 text-yellow-600 rounded-lg text-xs font-bold border border-yellow-100 whitespace-nowrap">🥛 유제품 (14일)</button><button type="button" onClick={() => setExpiryByCategory(30, '냉동')} className="px-3 py-2 bg-blue-50 text-blue-600 rounded-lg text-xs font-bold border border-blue-100 whitespace-nowrap">❄️ 냉동 (30일)</button></div></div>
-        <div><label className="block text-sm font-bold text-gray-700 mb-2">유통기한</label><input type="date" value={expiry} onChange={e=>setExpiry(e.target.value)} className="w-full p-4 bg-gray-50 rounded-xl border-none focus:ring-2 focus:ring-green-500" required /></div>
-        <div><label className="block text-sm font-bold text-gray-700 mb-2">보관 장소</label><div className="flex gap-3">{['fridge', 'freezer', 'pantry'].map(c => (<button type="button" key={c} onClick={() => setCategory(c)} className={`flex-1 py-3 rounded-xl capitalize font-bold transition-all ${category === c ? 'bg-green-100 text-green-700 ring-2 ring-green-500' : 'bg-gray-100 text-gray-400'}`}>{c}</button>))}</div></div>
-        <button className="w-full bg-green-600 text-white py-4 rounded-xl font-bold text-lg shadow-lg mt-auto">저장하기</button>
-      </form>
+        <div className="w-1/3">
+          <label className="block text-sm font-bold text-gray-700 mb-2">단위</label>
+          <select 
+            value={unit} 
+            onChange={e=>setUnit(e.target.value)}
+            className="w-full p-4 bg-gray-50 rounded-xl border-none focus:ring-2 focus:ring-green-500"
+          >
+            <option value="g">g</option>
+            <option value="kg">kg</option>
+            <option value="ml">ml</option>
+            <option value="L">L</option>
+            <option value="개">개</option>
+            <option value="봉">봉</option>
+          </select>
+        </div>
+      </div>
+      
+      {/* ... 가격 입력 필드 및 나머지 ... */}
     </div>
   );
 }
@@ -1637,7 +1683,17 @@ function InsightsView({ ingredients, onAddToCart, history }) {
 
   return (
     <div className="p-4 pb-20 animate-in fade-in duration-500">
-      <h2 className="text-lg font-bold mb-4 flex items-center gap-2"><BarChart2 className="text-green-600" /> 통계 및 분석</h2>
+      <div className="flex justify-between items-center mb-4">
+        <h2 className="text-lg font-bold flex items-center gap-2">
+          <BarChart2 className="text-green-600" /> 통계 및 분석
+        </h2>
+        <button 
+          onClick={onResetHistory} 
+          className="text-xs bg-gray-100 text-gray-500 px-3 py-1.5 rounded-lg flex items-center gap-1 hover:bg-red-50 hover:text-red-600 transition-colors"
+        >
+          <RefreshCcw size={12} /> 기록 초기화
+        </button>
+      </div>
       
       {/* 절약 금액 카드 (메인) */}
       <div className={`p-6 rounded-3xl shadow-lg mb-6 text-white relative overflow-hidden transition-colors ${netSavings >= 0 ? 'bg-gradient-to-br from-green-500 to-green-700' : 'bg-gradient-to-br from-red-500 to-red-700'}`}>
