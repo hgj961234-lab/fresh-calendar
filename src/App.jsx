@@ -59,7 +59,7 @@ try {
 
 // --- 유통기한 및 평균 시세 데이터베이스 (단위: 원, 기준 용량 명시) ---
 const SHELF_LIFE_DB = {
-  // 김치류 (kg 단위 기준 가격으로 현실화)
+  // 김치류
   '배추김치': { fridge: 90, freezer: 0, price: 15000, unit: '3kg', risk: { danger: 7, warning: 14 } }, 
   '부추김치': { fridge: 30, freezer: 0, price: 12000, unit: '1kg', risk: { danger: 5, warning: 10 } },
   '파김치': { fridge: 60, freezer: 0, price: 13000, unit: '1kg', risk: { danger: 7, warning: 14 } },
@@ -75,122 +75,122 @@ const SHELF_LIFE_DB = {
   '다짐육': { fridge: 2, freezer: 30, price: 8000, unit: '600g', risk: { danger: 1, warning: 2 } },
 
   // 가공육 & 햄 & 통조림
-  '베이컨': { fridge: 7, freezer: 30, price: 9000, risk: { danger: 2, warning: 4 } },
-  '햄': { fridge: 7, freezer: 30, price: 4000, risk: { danger: 2, warning: 4 } },
-  '소시지': { fridge: 14, freezer: 60, price: 5000, risk: { danger: 3, warning: 7 } },
-  '맛살': { fridge: 7, freezer: 0, price: 3000, risk: { danger: 2, warning: 4 } },
-  '어묵': { fridge: 6, freezer: 90, price: 2500, risk: { danger: 2, warning: 4 } },
-  '참치캔': { pantry: 1095, price: 2500, risk: { danger: 30, warning: 60 } },
-  '스팸': { pantry: 1095, price: 5000, risk: { danger: 30, warning: 60 } },
+  '베이컨': { fridge: 7, freezer: 30, price: 9000, unit: '200g', risk: { danger: 2, warning: 4 } },
+  '햄': { fridge: 7, freezer: 30, price: 4000, unit: '200g', risk: { danger: 2, warning: 4 } },
+  '소시지': { fridge: 14, freezer: 60, price: 5000, unit: '300g', risk: { danger: 3, warning: 7 } },
+  '맛살': { fridge: 7, freezer: 0, price: 3000, unit: '150g', risk: { danger: 2, warning: 4 } },
+  '어묵': { fridge: 6, freezer: 90, price: 2500, unit: '300g', risk: { danger: 2, warning: 4 } },
+  '참치캔': { pantry: 1095, price: 2500, unit: '150g', risk: { danger: 30, warning: 60 } },
+  '스팸': { pantry: 1095, price: 5000, unit: '200g', risk: { danger: 30, warning: 60 } },
 
   // 해산물
-  '고등어': { fridge: 2, freezer: 90, price: 5000, risk: { danger: 1, warning: 2 } },
-  '연어': { fridge: 2, freezer: 90, price: 20000, risk: { danger: 1, warning: 2 } },
-  '새우': { fridge: 2, freezer: 180, price: 12000, risk: { danger: 1, warning: 2 } },
-  '오징어': { fridge: 2, freezer: 180, price: 8000, risk: { danger: 1, warning: 2 } },
-  '바지락': { fridge: 2, freezer: 90, price: 4000, risk: { danger: 1, warning: 2 } },
-  '해물믹스': { fridge: 2, freezer: 180, price: 9000, risk: { danger: 1, warning: 2 } },
-  '김': { pantry: 180, price: 5000, risk: { danger: 7, warning: 14 } },
-  '미역': { pantry: 365, price: 3000, risk: { danger: 30, warning: 60 } },
-  '멸치': { pantry: 90, freezer: 365, price: 10000, risk: { danger: 7, warning: 14 } },
+  '고등어': { fridge: 2, freezer: 90, price: 5000, unit: '1마리', risk: { danger: 1, warning: 2 } }, // 마리 단위는 g 계산시 주의
+  '연어': { fridge: 2, freezer: 90, price: 20000, unit: '500g', risk: { danger: 1, warning: 2 } },
+  '새우': { fridge: 2, freezer: 180, price: 12000, unit: '400g', risk: { danger: 1, warning: 2 } },
+  '오징어': { fridge: 2, freezer: 180, price: 8000, unit: '2마리', risk: { danger: 1, warning: 2 } },
+  '바지락': { fridge: 2, freezer: 90, price: 4000, unit: '800g', risk: { danger: 1, warning: 2 } },
+  '해물믹스': { fridge: 2, freezer: 180, price: 9000, unit: '500g', risk: { danger: 1, warning: 2 } },
+  '김': { pantry: 180, price: 5000, unit: '16봉', risk: { danger: 7, warning: 14 } },
+  '미역': { pantry: 365, price: 3000, unit: '100g', risk: { danger: 30, warning: 60 } },
+  '멸치': { pantry: 90, freezer: 365, price: 10000, unit: '500g', risk: { danger: 7, warning: 14 } },
 
   // 유제품 & 계란
-  '우유': { fridge: 7, freezer: 30, price: 2800, risk: { danger: 2, warning: 4 } }, 
-  '달걀': { fridge: 30, freezer: 0, price: 8000, risk: { danger: 3, warning: 7 } }, 
-  '요거트': { fridge: 10, freezer: 30, price: 4000, risk: { danger: 2, warning: 5 } },
-  '치즈': { fridge: 20, freezer: 180, price: 5500, risk: { danger: 3, warning: 7 } },
-  '모짜렐라치즈': { fridge: 7, freezer: 90, price: 11000, risk: { danger: 2, warning: 5 } },
-  '생크림': { fridge: 7, freezer: 30, price: 6000, risk: { danger: 2, warning: 4 } },
-  '버터': { fridge: 90, freezer: 365, price: 9000, risk: { danger: 7, warning: 14 } },
+  '우유': { fridge: 7, freezer: 30, price: 2800, unit: '1L', risk: { danger: 2, warning: 4 } }, 
+  '달걀': { fridge: 30, freezer: 0, price: 8000, unit: '30구', risk: { danger: 3, warning: 7 } }, 
+  '요거트': { fridge: 10, freezer: 30, price: 4000, unit: '4개', risk: { danger: 2, warning: 5 } },
+  '치즈': { fridge: 20, freezer: 180, price: 5500, unit: '10장', risk: { danger: 3, warning: 7 } },
+  '모짜렐라치즈': { fridge: 7, freezer: 90, price: 11000, unit: '1kg', risk: { danger: 2, warning: 5 } },
+  '생크림': { fridge: 7, freezer: 30, price: 6000, unit: '500ml', risk: { danger: 2, warning: 4 } },
+  '버터': { fridge: 90, freezer: 365, price: 9000, unit: '450g', risk: { danger: 7, warning: 14 } },
 
   // 채소 & 농산물
-  '두부': { fridge: 5, freezer: 90, price: 1500, risk: { danger: 1, warning: 3 } },
-  '순두부': { fridge: 5, freezer: 0, price: 1000, risk: { danger: 1, warning: 3 } },
-  '콩나물': { fridge: 5, freezer: 0, price: 1500, risk: { danger: 1, warning: 3 } },
-  '숙주': { fridge: 3, freezer: 0, price: 1500, risk: { danger: 1, warning: 2 } },
-  '양파': { fridge: 14, freezer: 180, price: 4000, risk: { danger: 3, warning: 5 } }, 
-  '감자': { fridge: 30, freezer: 365, price: 5000, risk: { danger: 5, warning: 10 } },
-  '마늘': { fridge: 30, freezer: 365, price: 4000, risk: { danger: 5, warning: 10 } },
-  '다진마늘': { fridge: 14, freezer: 180, price: 6000, risk: { danger: 3, warning: 7 } },
-  '대파': { fridge: 14, freezer: 180, price: 3500, risk: { danger: 3, warning: 5 } },
-  '쪽파': { fridge: 7, freezer: 90, price: 4000, risk: { danger: 2, warning: 4 } },
-  '부추': { fridge: 5, freezer: 90, price: 2500, risk: { danger: 2, warning: 3 } },
-  '오이': { fridge: 7, freezer: 0, price: 1000, risk: { danger: 2, warning: 4 } },
-  '양배추': { fridge: 30, freezer: 90, price: 3000, risk: { danger: 5, warning: 10 } },
-  '당근': { fridge: 21, freezer: 365, price: 2000, risk: { danger: 3, warning: 7 } },
-  '무': { fridge: 14, freezer: 90, price: 2500, risk: { danger: 3, warning: 6 } },
-  '단무지': { fridge: 30, price: 3000, risk: { danger: 5, warning: 10 } },
-  '애호박': { fridge: 7, freezer: 90, price: 1500, risk: { danger: 2, warning: 4 } },
-  '토마토': { fridge: 10, freezer: 90, price: 5000, risk: { danger: 2, warning: 5 } },
-  '고수': { fridge: 5, freezer: 30, price: 2000, risk: { danger: 1, warning: 3 } },
-  '바질': { fridge: 5, freezer: 90, price: 2500, risk: { danger: 1, warning: 3 } },
-  '청양고추': { fridge: 7, freezer: 90, price: 2000, risk: { danger: 2, warning: 5 } },
-  '버섯': { fridge: 5, freezer: 30, price: 2500, risk: { danger: 2, warning: 3 } },
-  '시금치': { fridge: 3, freezer: 90, price: 3000, risk: { danger: 1, warning: 2 } },
-  '깻잎': { fridge: 5, freezer: 0, price: 1500, risk: { danger: 1, warning: 3 } },
-  '상추': { fridge: 5, freezer: 0, price: 2000, risk: { danger: 1, warning: 3 } },
-  '양상추': { fridge: 5, freezer: 0, price: 3000, risk: { danger: 1, warning: 3 } },
-  '아보카도': { fridge: 5, freezer: 90, price: 2500, risk: { danger: 2, warning: 4 } },
+  '두부': { fridge: 5, freezer: 90, price: 1500, unit: '300g', risk: { danger: 1, warning: 3 } },
+  '순두부': { fridge: 5, freezer: 0, price: 1000, unit: '350g', risk: { danger: 1, warning: 3 } },
+  '콩나물': { fridge: 5, freezer: 0, price: 1500, unit: '300g', risk: { danger: 1, warning: 3 } },
+  '숙주': { fridge: 3, freezer: 0, price: 1500, unit: '300g', risk: { danger: 1, warning: 2 } },
+  '양파': { fridge: 14, freezer: 180, price: 4000, unit: '1.5kg', risk: { danger: 3, warning: 5 } }, 
+  '감자': { fridge: 30, freezer: 365, price: 5000, unit: '1kg', risk: { danger: 5, warning: 10 } },
+  '마늘': { fridge: 30, freezer: 365, price: 4000, unit: '500g', risk: { danger: 5, warning: 10 } },
+  '다진마늘': { fridge: 14, freezer: 180, price: 6000, unit: '400g', risk: { danger: 3, warning: 7 } },
+  '대파': { fridge: 14, freezer: 180, price: 3500, unit: '1단', risk: { danger: 3, warning: 5 } },
+  '쪽파': { fridge: 7, freezer: 90, price: 4000, unit: '1단', risk: { danger: 2, warning: 4 } },
+  '부추': { fridge: 5, freezer: 90, price: 2500, unit: '1단', risk: { danger: 2, warning: 3 } },
+  '오이': { fridge: 7, freezer: 0, price: 1000, unit: '1개', risk: { danger: 2, warning: 4 } },
+  '양배추': { fridge: 30, freezer: 90, price: 3000, unit: '1통', risk: { danger: 5, warning: 10 } },
+  '당근': { fridge: 21, freezer: 365, price: 2000, unit: '1kg', risk: { danger: 3, warning: 7 } },
+  '무': { fridge: 14, freezer: 90, price: 2500, unit: '1개', risk: { danger: 3, warning: 6 } },
+  '단무지': { fridge: 30, price: 3000, unit: '400g', risk: { danger: 5, warning: 10 } },
+  '애호박': { fridge: 7, freezer: 90, price: 1500, unit: '1개', risk: { danger: 2, warning: 4 } },
+  '토마토': { fridge: 10, freezer: 90, price: 5000, unit: '1kg', risk: { danger: 2, warning: 5 } },
+  '고수': { fridge: 5, freezer: 30, price: 2000, unit: '50g', risk: { danger: 1, warning: 3 } },
+  '바질': { fridge: 5, freezer: 90, price: 2500, unit: '30g', risk: { danger: 1, warning: 3 } },
+  '청양고추': { fridge: 7, freezer: 90, price: 2000, unit: '150g', risk: { danger: 2, warning: 5 } },
+  '버섯': { fridge: 5, freezer: 30, price: 2500, unit: '200g', risk: { danger: 2, warning: 3 } },
+  '시금치': { fridge: 3, freezer: 90, price: 3000, unit: '1단', risk: { danger: 1, warning: 2 } },
+  '깻잎': { fridge: 5, freezer: 0, price: 1500, unit: '30장', risk: { danger: 1, warning: 3 } },
+  '상추': { fridge: 5, freezer: 0, price: 2000, unit: '200g', risk: { danger: 1, warning: 3 } },
+  '양상추': { fridge: 5, freezer: 0, price: 3000, unit: '1통', risk: { danger: 1, warning: 3 } },
+  '아보카도': { fridge: 5, freezer: 90, price: 2500, unit: '1개', risk: { danger: 2, warning: 4 } },
 
   // 과일
-  '사과': { fridge: 21, freezer: 0, price: 15000, risk: { danger: 3, warning: 7 } }, 
-  '바나나': { fridge: 5, freezer: 90, price: 4000, risk: { danger: 1, warning: 2 } },
-  '딸기': { fridge: 3, freezer: 180, price: 10000, risk: { danger: 1, warning: 2 } },
-  '귤': { fridge: 14, freezer: 0, price: 10000, risk: { danger: 3, warning: 6 } },
-  '레몬': { fridge: 21, freezer: 90, price: 1000, risk: { danger: 5, warning: 10 } },
-  '라임': { fridge: 21, freezer: 90, price: 1500, risk: { danger: 5, warning: 10 } },
+  '사과': { fridge: 21, freezer: 0, price: 15000, unit: '5개', risk: { danger: 3, warning: 7 } }, 
+  '바나나': { fridge: 5, freezer: 90, price: 4000, unit: '1송이', risk: { danger: 1, warning: 2 } },
+  '딸기': { fridge: 3, freezer: 180, price: 10000, unit: '500g', risk: { danger: 1, warning: 2 } },
+  '귤': { fridge: 14, freezer: 0, price: 10000, unit: '3kg', risk: { danger: 3, warning: 6 } },
+  '레몬': { fridge: 21, freezer: 90, price: 1000, unit: '1개', risk: { danger: 5, warning: 10 } },
+  '라임': { fridge: 21, freezer: 90, price: 1500, unit: '1개', risk: { danger: 5, warning: 10 } },
 
   // 곡류 & 면류 & 떡
-  '밥': { fridge: 3, freezer: 30, price: 1500, risk: { danger: 1, warning: 2 } },
-  '쌀': { pantry: 365, price: 40000, risk: { danger: 30, warning: 60 } },
-  '식빵': { pantry: 3, freezer: 30, price: 3500, risk: { danger: 1, warning: 2 } },
-  '떡': { fridge: 3, freezer: 90, price: 4000, risk: { danger: 1, warning: 3 } },
-  '소면': { pantry: 365, price: 3000, risk: { danger: 30, warning: 60 } },
-  '당면': { pantry: 365, price: 4000, risk: { danger: 30, warning: 60 } },
-  '파스타면': { pantry: 365, price: 3000, risk: { danger: 30, warning: 60 } },
-  '우동면': { fridge: 30, freezer: 180, price: 3000, risk: { danger: 5, warning: 10 } },
-  '라면': { pantry: 180, price: 4500, risk: { danger: 14, warning: 30 } },
-  '중화면': { fridge: 7, freezer: 60, price: 3000, risk: { danger: 2, warning: 4 } },
-  '쌀국수': { pantry: 365, price: 3000, risk: { danger: 30, warning: 60 } },
-  '또띠아': { fridge: 7, freezer: 90, price: 4000, risk: { danger: 2, warning: 5 } },
-  '바게트': { pantry: 2, freezer: 30, price: 3500, risk: { danger: 1, warning: 2 } },
-  '빵가루': { pantry: 90, freezer: 180, price: 2500, risk: { danger: 7, warning: 14 } },
+  '밥': { fridge: 3, freezer: 30, price: 1500, unit: '210g', risk: { danger: 1, warning: 2 } }, // 햇반 기준
+  '쌀': { pantry: 365, price: 40000, unit: '10kg', risk: { danger: 30, warning: 60 } },
+  '식빵': { pantry: 3, freezer: 30, price: 3500, unit: '1봉', risk: { danger: 1, warning: 2 } },
+  '떡': { fridge: 3, freezer: 90, price: 4000, unit: '400g', risk: { danger: 1, warning: 3 } },
+  '소면': { pantry: 365, price: 3000, unit: '900g', risk: { danger: 30, warning: 60 } },
+  '당면': { pantry: 365, price: 4000, unit: '500g', risk: { danger: 30, warning: 60 } },
+  '파스타면': { pantry: 365, price: 3000, unit: '500g', risk: { danger: 30, warning: 60 } },
+  '우동면': { fridge: 30, freezer: 180, price: 3000, unit: '5개', risk: { danger: 5, warning: 10 } },
+  '라면': { pantry: 180, price: 4500, unit: '5개', risk: { danger: 14, warning: 30 } },
+  '중화면': { fridge: 7, freezer: 60, price: 3000, unit: '3개', risk: { danger: 2, warning: 4 } },
+  '쌀국수': { pantry: 365, price: 3000, unit: '300g', risk: { danger: 30, warning: 60 } },
+  '또띠아': { fridge: 7, freezer: 90, price: 4000, unit: '12장', risk: { danger: 2, warning: 5 } },
+  '바게트': { pantry: 2, freezer: 30, price: 3500, unit: '1개', risk: { danger: 1, warning: 2 } },
+  '빵가루': { pantry: 90, freezer: 180, price: 2500, unit: '500g', risk: { danger: 7, warning: 14 } },
 
   // 소스 & 양념 (병/팩 단위)
-  '간장': { pantry: 180, fridge: 365, price: 6000, risk: { danger: 30, warning: 60 } },
-  '고추장': { fridge: 365, price: 8000, risk: { danger: 30, warning: 60 } },
-  '된장': { fridge: 365, price: 8000, risk: { danger: 30, warning: 60 } },
-  '쌈장': { fridge: 180, price: 4000, risk: { danger: 14, warning: 30 } },
-  '고춧가루': { freezer: 365, pantry: 90, price: 15000, risk: { danger: 14, warning: 30 } },
-  '설탕': { pantry: 730, price: 3000, risk: { danger: 60, warning: 120 } },
-  '소금': { pantry: 1825, price: 2000, risk: { danger: 60, warning: 120 } },
-  '후추': { pantry: 365, price: 4000, risk: { danger: 30, warning: 60 } },
-  '식초': { pantry: 365, price: 2500, risk: { danger: 30, warning: 60 } },
-  '맛술': { pantry: 180, price: 3500, risk: { danger: 14, warning: 30 } },
-  '참기름': { pantry: 90, price: 8000, risk: { danger: 14, warning: 30 } },
-  '들기름': { pantry: 90, price: 12000, risk: { danger: 14, warning: 30 } },
-  '식용유': { pantry: 365, price: 5000, risk: { danger: 30, warning: 60 } },
-  '올리브오일': { pantry: 365, price: 12000, risk: { danger: 30, warning: 60 } },
-  '굴소스': { fridge: 180, price: 4500, risk: { danger: 14, warning: 30 } },
-  '마요네즈': { fridge: 90, price: 4000, risk: { danger: 7, warning: 14 } },
-  '케찹': { fridge: 90, price: 3000, risk: { danger: 7, warning: 14 } },
-  '머스타드': { fridge: 180, price: 3000, risk: { danger: 14, warning: 30 } },
-  '칠리소스': { fridge: 180, price: 4000, risk: { danger: 14, warning: 30 } },
-  '토마토소스': { fridge: 5, price: 5000, risk: { danger: 2, warning: 3 } },
-  '크림소스': { fridge: 3, price: 5000, risk: { danger: 1, warning: 2 } },
-  '카레': { pantry: 365, price: 3500, risk: { danger: 30, warning: 60 } },
-  '전분': { pantry: 365, price: 2000, risk: { danger: 30, warning: 60 } },
-  '밀가루': { pantry: 180, price: 2500, risk: { danger: 14, warning: 30 } },
-  '부침가루': { pantry: 180, price: 2500, risk: { danger: 14, warning: 30 } },
-  '튀김가루': { pantry: 180, price: 2500, risk: { danger: 14, warning: 30 } },
-  '다시다': { pantry: 365, price: 5000, risk: { danger: 30, warning: 60 } },
-  '액젓': { pantry: 365, price: 5000, risk: { danger: 30, warning: 60 } },
-  '육수': { fridge: 3, freezer: 30, price: 1500, risk: { danger: 1, warning: 2 } },
-  '물엿': { pantry: 365, price: 3000, risk: { danger: 30, warning: 60 } },
-  '올리고당': { pantry: 365, price: 4000, risk: { danger: 30, warning: 60 } },
-    
+  '간장': { pantry: 180, fridge: 365, price: 6000, unit: '1L', risk: { danger: 30, warning: 60 } },
+  '고추장': { fridge: 365, price: 8000, unit: '1kg', risk: { danger: 30, warning: 60 } },
+  '된장': { fridge: 365, price: 8000, unit: '1kg', risk: { danger: 30, warning: 60 } },
+  '쌈장': { fridge: 180, price: 4000, unit: '500g', risk: { danger: 14, warning: 30 } },
+  '고춧가루': { freezer: 365, pantry: 90, price: 15000, unit: '500g', risk: { danger: 14, warning: 30 } },
+  '설탕': { pantry: 730, price: 3000, unit: '1kg', risk: { danger: 60, warning: 120 } },
+  '소금': { pantry: 1825, price: 2000, unit: '1kg', risk: { danger: 60, warning: 120 } },
+  '후추': { pantry: 365, price: 4000, unit: '50g', risk: { danger: 30, warning: 60 } },
+  '식초': { pantry: 365, price: 2500, unit: '900ml', risk: { danger: 30, warning: 60 } },
+  '맛술': { pantry: 180, price: 3500, unit: '900ml', risk: { danger: 14, warning: 30 } },
+  '참기름': { pantry: 90, price: 8000, unit: '350ml', risk: { danger: 14, warning: 30 } },
+  '들기름': { pantry: 90, price: 12000, unit: '350ml', risk: { danger: 14, warning: 30 } },
+  '식용유': { pantry: 365, price: 5000, unit: '900ml', risk: { danger: 30, warning: 60 } },
+  '올리브오일': { pantry: 365, price: 12000, unit: '500ml', risk: { danger: 30, warning: 60 } },
+  '굴소스': { fridge: 180, price: 4500, unit: '350g', risk: { danger: 14, warning: 30 } },
+  '마요네즈': { fridge: 90, price: 4000, unit: '500g', risk: { danger: 7, warning: 14 } },
+  '케찹': { fridge: 90, price: 3000, unit: '500g', risk: { danger: 7, warning: 14 } },
+  '머스타드': { fridge: 180, price: 3000, unit: '250g', risk: { danger: 14, warning: 30 } },
+  '칠리소스': { fridge: 180, price: 4000, unit: '300g', risk: { danger: 14, warning: 30 } },
+  '토마토소스': { fridge: 5, price: 5000, unit: '600g', risk: { danger: 2, warning: 3 } },
+  '크림소스': { fridge: 3, price: 5000, unit: '350g', risk: { danger: 1, warning: 2 } },
+  '카레': { pantry: 365, price: 3500, unit: '100g', risk: { danger: 30, warning: 60 } },
+  '전분': { pantry: 365, price: 2000, unit: '400g', risk: { danger: 30, warning: 60 } },
+  '밀가루': { pantry: 180, price: 2500, unit: '1kg', risk: { danger: 14, warning: 30 } },
+  '부침가루': { pantry: 180, price: 2500, unit: '1kg', risk: { danger: 14, warning: 30 } },
+  '튀김가루': { pantry: 180, price: 2500, unit: '1kg', risk: { danger: 14, warning: 30 } },
+  '다시다': { pantry: 365, price: 5000, unit: '300g', risk: { danger: 30, warning: 60 } },
+  '액젓': { pantry: 365, price: 5000, unit: '1kg', risk: { danger: 30, warning: 60 } },
+  '육수': { fridge: 3, freezer: 30, price: 1500, unit: '500g', risk: { danger: 1, warning: 2 } },
+  '물엿': { pantry: 365, price: 3000, unit: '700g', risk: { danger: 30, warning: 60 } },
+  '올리고당': { pantry: 365, price: 4000, unit: '700g', risk: { danger: 30, warning: 60 } },
+   
   // 기본값
-  'default': { fridge: 7, price: 3000, unit: '1팩', risk: { danger: 2, warning: 4 } }
+  'default': { fridge: 7, price: 3000, unit: '100g', risk: { danger: 2, warning: 4 } }
 };
 
 // --- 레시피 데이터베이스 (60종 - 상세 버전 & 재료 동기화) ---
@@ -1411,15 +1411,29 @@ function FridgeListView({ ingredients, getRiskLevel, moveToTrash, consumeItem, u
     return Math.round(estimated / 10) * 10; // 10원 단위 반올림
   };
 
-  // 🛠️ 수정 모달 (가격 연동 로직 포함)
+  // 🛠️ 수정 모달 (가격 연동 및 단위 자동 감지 포함)
   const EditModal = () => {
     if (!editingItem) return null;
+    
+    // 🧠 [추가] 초기 단위 결정 로직 (DB 참고)
+    const getInitialUnit = () => {
+        if (editingItem.unit) return editingItem.unit; // 이미 저장된게 있으면 그거 씀
+        const dbInfo = SHELF_LIFE_DB[editingItem.name] || SHELF_LIFE_DB[editingItem.name.replace(/\s/g, '')];
+        if (dbInfo && dbInfo.unit) {
+            if (/[구개마리송이통단봉장]/.test(dbInfo.unit)) return '개';
+            if (/[Lml]/.test(dbInfo.unit)) return 'ml';
+        }
+        return 'g';
+    };
+
     const initialDate = editingItem.expiry ? new Date(editingItem.expiry).toISOString().split('T')[0] : new Date().toISOString().split('T')[0];
     
     const [date, setDate] = useState(initialDate);
     const [price, setPrice] = useState(editingItem.price || 0);
     const [amount, setAmount] = useState(editingItem.amount || 0);
-    const [unit, setUnit] = useState(editingItem.unit || 'g');
+    
+    // 🟢 [수정] 초기값 세팅 시 함수 실행
+    const [unit, setUnit] = useState(getInitialUnit()); 
 
     // 용량 변경 시 가격 자동 계산 핸들러
     const handleAmountChange = (e) => {
@@ -1435,6 +1449,41 @@ function FridgeListView({ ingredients, getRiskLevel, moveToTrash, consumeItem, u
         const autoPrice = calculateAutoPrice(editingItem.name, amount, newUnit);
         if (autoPrice !== null) setPrice(autoPrice);
     };
+
+    return (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-6" onClick={() => setEditingItem(null)}>
+            <div className="bg-white rounded-2xl w-full max-w-sm p-6" onClick={e => e.stopPropagation()}>
+                <h3 className="text-lg font-bold mb-4">재료 정보 수정</h3>
+                <div className="mb-4"><span className="text-gray-500 text-xs">제품명</span><div className="font-bold text-xl">{editingItem.name}</div></div>
+                
+                <div className="flex gap-2 mb-4">
+                   <div className="flex-1">
+                     <label className="block text-sm text-gray-600 mb-1">용량</label>
+                     <div className="flex gap-1">
+                        <input type="number" value={amount} onChange={handleAmountChange} className="w-full p-2 border rounded-lg bg-gray-50" placeholder="0" />
+                        <select value={unit} onChange={handleUnitChange} className="p-2 border rounded-lg bg-gray-50 text-sm">
+                            <option value="g">g</option><option value="kg">kg</option>
+                            <option value="ml">ml</option><option value="L">L</option>
+                            <option value="개">개</option><option value="봉">봉</option>
+                        </select>
+                     </div>
+                   </div>
+                   <div className="flex-1">
+                     <label className="block text-sm text-gray-600 mb-1">예상 금액 (원)</label>
+                     <input type="number" value={price} onChange={e => setPrice(e.target.value)} className="w-full p-2 border rounded-lg bg-gray-50" />
+                   </div>
+                </div>
+
+                <div className="mb-6"><label className="block text-sm text-gray-600 mb-2">유통기한</label><input type="date" value={date} onChange={e => setDate(e.target.value)} className="w-full p-3 border rounded-xl text-lg bg-gray-50" /></div>
+                
+                <button onClick={() => { 
+                    updateIngredient(editingItem.id, { expiry: new Date(date), price: Number(price), amount: Number(amount), unit }); 
+                    setEditingItem(null); 
+                }} className="w-full bg-green-600 text-white py-3 rounded-xl font-bold">저장하기</button>
+            </div>
+        </div>
+    );
+  };
 
     return (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-6" onClick={() => setEditingItem(null)}>
@@ -1643,22 +1692,38 @@ function AddItemModal({ onClose, onAdd, initialDate }) {
   );
 }
 
-// --- 장바구니 뷰 (용량 입력 시 가격 자동 연동) ---
+// --- 장바구니 뷰 (자동 단위 설정 및 가격 연동) ---
 function ShoppingCartView({ cart, onUpdateCount, onRemove, onCheckout, onUpdateDetail }) {
   const [selectedNames, setSelectedNames] = useState([]);
   const toggleSelection = (name) => { if (selectedNames.includes(name)) setSelectedNames(selectedNames.filter(n => n !== name)); else setSelectedNames([...selectedNames, name]); };
   const toggleSelectAll = () => { if (selectedNames.length === cart.length && cart.length > 0) setSelectedNames([]); else setSelectedNames(cart.map(i => i.name)); };
+
+  // 🧠 [추가] DB 정보를 보고 알맞은 단위를 찾아주는 함수
+  const getDefaultUnit = (name) => {
+    const dbInfo = SHELF_LIFE_DB[name] || SHELF_LIFE_DB[name.replace(/\s/g, '')];
+    if (!dbInfo || !dbInfo.unit) return 'g';
+    
+    // DB 단위에 이런 글자가 있으면 '개'로 설정
+    if (/[구개마리송이통단봉장]/.test(dbInfo.unit)) return '개';
+    if (/[Lml]/.test(dbInfo.unit)) return 'ml';
+    return 'g';
+  };
 
   // 💰 가격 자동 계산 헬퍼
   const calculateAutoPrice = (name, inputAmount, inputUnit) => {
     const dbInfo = SHELF_LIFE_DB[name] || SHELF_LIFE_DB[name.replace(/\s/g, '')];
     if (!dbInfo || !dbInfo.unit || !dbInfo.price) return null;
 
-    let dbAmount = parseFloat(dbInfo.unit.replace(/[^0-9.]/g, '')) || 1;
-    if (dbInfo.unit.includes('kg')) dbAmount *= 1000;
+    let dbUnitStr = dbInfo.unit || '100g';
+    let dbAmount = parseFloat(dbUnitStr.replace(/[^0-9.]/g, '')) || 1;
+    
+    if (dbUnitStr.includes('kg')) dbAmount *= 1000;
+    else if (dbUnitStr.includes('L')) dbAmount *= 1000;
 
     let currentAmount = parseFloat(inputAmount) || 0;
-    if (inputUnit === 'kg') currentAmount *= 1000;
+    if (inputUnit === 'kg' || inputUnit === 'L') currentAmount *= 1000;
+
+    if (dbAmount === 0) return dbInfo.price;
 
     const estimated = (dbInfo.price / dbAmount) * currentAmount;
     return Math.round(estimated / 10) * 10;
@@ -1666,7 +1731,9 @@ function ShoppingCartView({ cart, onUpdateCount, onRemove, onCheckout, onUpdateD
 
   const handleAmountChange = (item, newAmount) => {
       const updates = { amount: newAmount };
-      const autoPrice = calculateAutoPrice(item.name, newAmount, item.unit || 'g');
+      // 🟢 단위가 없으면 자동 설정된 단위를 가져와서 계산에 사용
+      const currentUnit = item.unit || getDefaultUnit(item.name);
+      const autoPrice = calculateAutoPrice(item.name, newAmount, currentUnit);
       if (autoPrice !== null) updates.price = autoPrice;
       onUpdateDetail(item.id, updates);
   };
@@ -1684,7 +1751,11 @@ function ShoppingCartView({ cart, onUpdateCount, onRemove, onCheckout, onUpdateD
       {cart.length === 0 ? <div className="text-center py-20 text-gray-400">장바구니가 비었습니다.</div> : (
         <div className="space-y-3">
           <div className="flex items-center justify-between mb-2"><button onClick={toggleSelectAll} className="flex items-center gap-2 text-sm text-gray-600"><CheckSquare size={18} /> 전체 선택</button>{selectedNames.length > 0 && <button onClick={()=>onRemove(selectedNames)} className="text-xs text-red-500">선택 삭제</button>}</div>
-          {cart.map(item => (
+          {cart.map(item => {
+            // 🟢 [핵심] 여기서 초기 단위를 결정합니다!
+            const currentUnit = item.unit || getDefaultUnit(item.name);
+
+            return (
             <div key={item.id} className="bg-white p-4 rounded-xl border shadow-sm space-y-3">
                 <div className="flex justify-between items-center">
                     <div className="flex items-center gap-3">
@@ -1700,21 +1771,23 @@ function ShoppingCartView({ cart, onUpdateCount, onRemove, onCheckout, onUpdateD
 
                 <div className="flex gap-2 bg-gray-50 p-2 rounded-lg">
                     <div className="flex-1">
-                        <label className="text-[10px] text-gray-500 block">용량(g/개)</label>
+                        <label className="text-[10px] text-gray-500 block">용량/수량</label>
                         <div className="flex gap-1">
                             <input 
                                 type="number" 
-                                placeholder="500"
+                                placeholder="0"
                                 value={item.amount || ''} 
                                 onChange={(e) => handleAmountChange(item, e.target.value)} 
                                 className="w-full bg-white border rounded px-1 py-1 text-sm outline-none focus:border-green-500"
                             />
                             <select 
-                                value={item.unit || 'g'} 
+                                value={currentUnit} 
                                 onChange={(e) => handleUnitChange(item, e.target.value)}
                                 className="bg-white border rounded text-xs"
                             >
-                                <option value="g">g</option><option value="kg">kg</option><option value="ml">ml</option><option value="개">개</option>
+                                <option value="g">g</option><option value="kg">kg</option>
+                                <option value="ml">ml</option><option value="L">L</option>
+                                <option value="개">개</option><option value="봉">봉</option>
                             </select>
                         </div>
                     </div>
@@ -1722,7 +1795,7 @@ function ShoppingCartView({ cart, onUpdateCount, onRemove, onCheckout, onUpdateD
                         <label className="text-[10px] text-gray-500 block">예상 가격(원)</label>
                         <input 
                             type="number" 
-                            placeholder="3000"
+                            placeholder="0"
                             value={item.price || ''} 
                             onChange={(e) => onUpdateDetail(item.id, { price: e.target.value })} 
                             className="w-full bg-white border rounded px-1 py-1 text-sm outline-none focus:border-green-500"
@@ -1730,7 +1803,7 @@ function ShoppingCartView({ cart, onUpdateCount, onRemove, onCheckout, onUpdateD
                     </div>
                 </div>
             </div>
-          ))}
+          )})}
           <button onClick={()=>onCheckout(selectedNames)} disabled={selectedNames.length===0} className="w-full bg-green-600 text-white py-3 rounded-xl font-bold mt-4 disabled:bg-gray-300">냉장고로 이동</button>
         </div>
       )}
