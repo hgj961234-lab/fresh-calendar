@@ -1364,7 +1364,7 @@ function CalendarView({ ingredients, getRiskLevel, onAddRequest }) {
   );
 }
 
-// --- 냉장고 목록 뷰 (개별 선택 및 수정 기능 강화) ---
+// --- 냉장고 목록 뷰 (용량-가격 연동 및 수정 기능) ---
 function FridgeListView({ ingredients, getRiskLevel, moveToTrash, consumeItem, updateIngredient, onOpenTrash }) {
   const sorted = [...ingredients].sort((a,b) => (a.expiry || 0) - (b.expiry || 0));
   const [editingItem, setEditingItem] = useState(null);
@@ -1395,16 +1395,46 @@ function FridgeListView({ ingredients, getRiskLevel, moveToTrash, consumeItem, u
       setSelectedIds([]);
   }
 
-  // 🛠️ 수정 모달 (가격, 용량 추가됨)
+  // 💰 가격 자동 계산 헬퍼 함수
+  const calculateAutoPrice = (name, inputAmount, inputUnit) => {
+    const dbInfo = SHELF_LIFE_DB[name] || SHELF_LIFE_DB[name.replace(/\s/g, '')];
+    if (!dbInfo || !dbInfo.unit || !dbInfo.price) return null;
+
+    let dbAmount = parseFloat(dbInfo.unit.replace(/[^0-9.]/g, '')) || 1;
+    if (dbInfo.unit.includes('kg')) dbAmount *= 1000;
+
+    let currentAmount = parseFloat(inputAmount) || 0;
+    if (inputUnit === 'kg') currentAmount *= 1000;
+
+    // 비례식: (DB가격 / DB용량) * 현재용량
+    const estimated = (dbInfo.price / dbAmount) * currentAmount;
+    return Math.round(estimated / 10) * 10; // 10원 단위 반올림
+  };
+
+  // 🛠️ 수정 모달 (가격 연동 로직 포함)
   const EditModal = () => {
     if (!editingItem) return null;
     const initialDate = editingItem.expiry ? new Date(editingItem.expiry).toISOString().split('T')[0] : new Date().toISOString().split('T')[0];
     
-    // 로컬 상태 관리
     const [date, setDate] = useState(initialDate);
     const [price, setPrice] = useState(editingItem.price || 0);
     const [amount, setAmount] = useState(editingItem.amount || 0);
     const [unit, setUnit] = useState(editingItem.unit || 'g');
+
+    // 용량 변경 시 가격 자동 계산 핸들러
+    const handleAmountChange = (e) => {
+        const newAmt = e.target.value;
+        setAmount(newAmt);
+        const autoPrice = calculateAutoPrice(editingItem.name, newAmt, unit);
+        if (autoPrice !== null) setPrice(autoPrice);
+    };
+
+    const handleUnitChange = (e) => {
+        const newUnit = e.target.value;
+        setUnit(newUnit);
+        const autoPrice = calculateAutoPrice(editingItem.name, amount, newUnit);
+        if (autoPrice !== null) setPrice(autoPrice);
+    };
 
     return (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-6" onClick={() => setEditingItem(null)}>
@@ -1414,17 +1444,17 @@ function FridgeListView({ ingredients, getRiskLevel, moveToTrash, consumeItem, u
                 
                 <div className="flex gap-2 mb-4">
                    <div className="flex-1">
-                     <label className="block text-sm text-gray-600 mb-1">가격 (원)</label>
-                     <input type="number" value={price} onChange={e => setPrice(e.target.value)} className="w-full p-2 border rounded-lg bg-gray-50" />
-                   </div>
-                   <div className="flex-1">
                      <label className="block text-sm text-gray-600 mb-1">용량</label>
                      <div className="flex gap-1">
-                        <input type="number" value={amount} onChange={e => setAmount(e.target.value)} className="w-full p-2 border rounded-lg bg-gray-50" />
-                        <select value={unit} onChange={e=>setUnit(e.target.value)} className="p-2 border rounded-lg bg-gray-50 text-sm">
+                        <input type="number" value={amount} onChange={handleAmountChange} className="w-full p-2 border rounded-lg bg-gray-50" placeholder="0" />
+                        <select value={unit} onChange={handleUnitChange} className="p-2 border rounded-lg bg-gray-50 text-sm">
                             <option value="g">g</option><option value="kg">kg</option><option value="ml">ml</option><option value="개">개</option>
                         </select>
                      </div>
+                   </div>
+                   <div className="flex-1">
+                     <label className="block text-sm text-gray-600 mb-1">예상 금액 (원)</label>
+                     <input type="number" value={price} onChange={e => setPrice(e.target.value)} className="w-full p-2 border rounded-lg bg-gray-50" />
                    </div>
                 </div>
 
@@ -1478,7 +1508,6 @@ function FridgeListView({ ingredients, getRiskLevel, moveToTrash, consumeItem, u
           return (
             <div key={item.id} className={`bg-white p-3 rounded-2xl border shadow-sm transition-all flex items-center justify-between group ${isSelected ? 'ring-2 ring-green-500 bg-green-50' : 'hover:border-green-300'}`}>
               <div className="flex items-center gap-3 flex-1 cursor-pointer" onClick={() => toggleSelect(item.id)}>
-                {/* 체크박스 UI */}
                 <div className={`text-gray-300 transition-colors ${isSelected ? 'text-green-600' : 'group-hover:text-gray-400'}`}>
                     {isSelected ? <CheckSquare size={20} /> : <Square size={20} />}
                 </div>
@@ -1614,11 +1643,40 @@ function AddItemModal({ onClose, onAdd, initialDate }) {
   );
 }
 
-// --- 장바구니 뷰 (가격/용량 입력 추가) ---
+// --- 장바구니 뷰 (용량 입력 시 가격 자동 연동) ---
 function ShoppingCartView({ cart, onUpdateCount, onRemove, onCheckout, onUpdateDetail }) {
   const [selectedNames, setSelectedNames] = useState([]);
   const toggleSelection = (name) => { if (selectedNames.includes(name)) setSelectedNames(selectedNames.filter(n => n !== name)); else setSelectedNames([...selectedNames, name]); };
   const toggleSelectAll = () => { if (selectedNames.length === cart.length && cart.length > 0) setSelectedNames([]); else setSelectedNames(cart.map(i => i.name)); };
+
+  // 💰 가격 자동 계산 헬퍼
+  const calculateAutoPrice = (name, inputAmount, inputUnit) => {
+    const dbInfo = SHELF_LIFE_DB[name] || SHELF_LIFE_DB[name.replace(/\s/g, '')];
+    if (!dbInfo || !dbInfo.unit || !dbInfo.price) return null;
+
+    let dbAmount = parseFloat(dbInfo.unit.replace(/[^0-9.]/g, '')) || 1;
+    if (dbInfo.unit.includes('kg')) dbAmount *= 1000;
+
+    let currentAmount = parseFloat(inputAmount) || 0;
+    if (inputUnit === 'kg') currentAmount *= 1000;
+
+    const estimated = (dbInfo.price / dbAmount) * currentAmount;
+    return Math.round(estimated / 10) * 10;
+  };
+
+  const handleAmountChange = (item, newAmount) => {
+      const updates = { amount: newAmount };
+      const autoPrice = calculateAutoPrice(item.name, newAmount, item.unit || 'g');
+      if (autoPrice !== null) updates.price = autoPrice;
+      onUpdateDetail(item.id, updates);
+  };
+
+  const handleUnitChange = (item, newUnit) => {
+      const updates = { unit: newUnit };
+      const autoPrice = calculateAutoPrice(item.name, item.amount || 0, newUnit);
+      if (autoPrice !== null) updates.price = autoPrice;
+      onUpdateDetail(item.id, updates);
+  };
 
   return (
     <div className="p-4 pb-20">
@@ -1628,7 +1686,6 @@ function ShoppingCartView({ cart, onUpdateCount, onRemove, onCheckout, onUpdateD
           <div className="flex items-center justify-between mb-2"><button onClick={toggleSelectAll} className="flex items-center gap-2 text-sm text-gray-600"><CheckSquare size={18} /> 전체 선택</button>{selectedNames.length > 0 && <button onClick={()=>onRemove(selectedNames)} className="text-xs text-red-500">선택 삭제</button>}</div>
           {cart.map(item => (
             <div key={item.id} className="bg-white p-4 rounded-xl border shadow-sm space-y-3">
-                {/* 상단: 선택 및 이름, 수량 */}
                 <div className="flex justify-between items-center">
                     <div className="flex items-center gap-3">
                         <button onClick={()=>toggleSelection(item.name)}>{selectedNames.includes(item.name) ? <CheckSquare className="text-green-600"/> : <Square className="text-gray-300"/>}</button>
@@ -1641,8 +1698,26 @@ function ShoppingCartView({ cart, onUpdateCount, onRemove, onCheckout, onUpdateD
                     </div>
                 </div>
 
-                {/* 하단: 가격 및 용량 입력 (여기서 입력한 값이 냉장고로 넘어감) */}
                 <div className="flex gap-2 bg-gray-50 p-2 rounded-lg">
+                    <div className="flex-1">
+                        <label className="text-[10px] text-gray-500 block">용량(g/개)</label>
+                        <div className="flex gap-1">
+                            <input 
+                                type="number" 
+                                placeholder="500"
+                                value={item.amount || ''} 
+                                onChange={(e) => handleAmountChange(item, e.target.value)} 
+                                className="w-full bg-white border rounded px-1 py-1 text-sm outline-none focus:border-green-500"
+                            />
+                            <select 
+                                value={item.unit || 'g'} 
+                                onChange={(e) => handleUnitChange(item, e.target.value)}
+                                className="bg-white border rounded text-xs"
+                            >
+                                <option value="g">g</option><option value="kg">kg</option><option value="ml">ml</option><option value="개">개</option>
+                            </select>
+                        </div>
+                    </div>
                     <div className="flex-1">
                         <label className="text-[10px] text-gray-500 block">예상 가격(원)</label>
                         <input 
@@ -1652,25 +1727,6 @@ function ShoppingCartView({ cart, onUpdateCount, onRemove, onCheckout, onUpdateD
                             onChange={(e) => onUpdateDetail(item.id, { price: e.target.value })} 
                             className="w-full bg-white border rounded px-1 py-1 text-sm outline-none focus:border-green-500"
                         />
-                    </div>
-                    <div className="flex-1">
-                        <label className="text-[10px] text-gray-500 block">용량(g/개)</label>
-                        <div className="flex gap-1">
-                            <input 
-                                type="number" 
-                                placeholder="500"
-                                value={item.amount || ''} 
-                                onChange={(e) => onUpdateDetail(item.id, { amount: e.target.value })} 
-                                className="w-full bg-white border rounded px-1 py-1 text-sm outline-none focus:border-green-500"
-                            />
-                            <select 
-                                value={item.unit || 'g'} 
-                                onChange={(e) => onUpdateDetail(item.id, { unit: e.target.value })}
-                                className="bg-white border rounded text-xs"
-                            >
-                                <option value="g">g</option><option value="kg">kg</option><option value="ml">ml</option><option value="개">개</option>
-                            </select>
-                        </div>
                     </div>
                 </div>
             </div>
@@ -1682,26 +1738,28 @@ function ShoppingCartView({ cart, onUpdateCount, onRemove, onCheckout, onUpdateD
   );
 }
 
-// --- 레시피 뷰 (부추김치 및 김 매칭 오류 수정됨) ---
+// // --- 레시피 뷰 (알림 제거 & 버튼 피드백 추가) ---
 function RecipeView({ ingredients, onAddToCart, recipes }) { 
   const [selectedIngredients, setSelectedIngredients] = useState([]);
   const [selectedRecipe, setSelectedRecipe] = useState(null);
   const [filterCategory, setFilterCategory] = useState('All');
   const [servings, setServings] = useState(1); 
+  // 👇 추가된 부분: 어떤 재료가 담겼는지 잠깐 보여주기 위한 상태
+  const [addedItems, setAddedItems] = useState({}); 
+
   const categories = ['All', 'Korean', 'Japanese', 'Chinese', 'Italian', 'Other'];
 
   const toggleSelection = (name) => { if (selectedIngredients.includes(name)) setSelectedIngredients(selectedIngredients.filter(i => i !== name)); else setSelectedIngredients([...selectedIngredients, name]); };
   const toggleSelectAll = () => { if (selectedIngredients.length === ingredients.length && ingredients.length > 0) setSelectedIngredients([]); else setSelectedIngredients(ingredients.map(i => i.name)); };
   const scaleText = (text, multiplier) => { if (multiplier === 1) return text; return text.replace(/(\d+\/\d+|\d+(?:\.\d+)?)(\s*[a-zA-Zㄱ-ㅎㅏ-ㅣ가-힣%도]*)/g, (match, number, unit) => { let val = number.includes('/') ? parseInt(number.split('/')[0]) / parseInt(number.split('/')[1]) : parseFloat(number); if (!val) return match; let scaled = val * multiplier; return `${Number.isInteger(scaled) ? scaled : parseFloat(scaled.toFixed(1))}${unit}`; }); };
   
-  // 수정된 매칭 로직 (부추김치 & 김 오류 해결)
   const matchIngredient = (recipeIng, userIng) => {
     const r = recipeIng.replace(/\s/g, ''); 
     const u = userIng.replace(/\s/g, ''); 
     
     if (r === u) return true;
-    if (r === '김' && u.includes('김치')) return false; // 김 != 김치
-    if (u.includes('부추김치') && (r === '부추' || r === '김치')) return false; // 부추김치 != 부추, 김치
+    if (r === '김' && u.includes('김치')) return false; 
+    if (u.includes('부추김치') && (r === '부추' || r === '김치')) return false; 
     
     return r.includes(u) || u.includes(r);
   };
@@ -1716,8 +1774,17 @@ function RecipeView({ ingredients, onAddToCart, recipes }) {
       return { ...recipe, existing, missing, score: existing.length }; 
     }).sort((a, b) => b.score - a.score); 
   };
-  
+   
   const matchedRecipes = getMatchedRecipes();
+
+  // 👇 추가된 함수: 알림 없이 조용히 담고 상태만 변경
+  const handleAddSmoothly = (ing) => {
+    onAddToCart(ing);
+    setAddedItems(prev => ({...prev, [ing]: true}));
+    setTimeout(() => {
+        setAddedItems(prev => ({...prev, [ing]: false}));
+    }, 1000); // 1초 뒤 원상복구
+  };
 
   if (selectedRecipe) {
       const scaledMeasure = scaleText(selectedRecipe.measure, servings);
@@ -1725,7 +1792,23 @@ function RecipeView({ ingredients, onAddToCart, recipes }) {
       return (
           <div className="p-4 pb-20 h-full flex flex-col bg-white">
               <div className="flex justify-between items-center mb-4"><button onClick={() => { setSelectedRecipe(null); setServings(1); }} className="flex items-center gap-2 text-gray-500 hover:text-green-600"><ArrowLeft size={20} /> Back</button><div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1"><Users size={14} className="text-gray-400 ml-1 mr-1"/>{[1, 2, 3, 4, 5, 6].map(num => (<button key={num} onClick={() => setServings(num)} className={`w-7 h-7 flex items-center justify-center rounded-md text-xs font-bold transition-all ${servings === num ? 'bg-white text-green-600 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}>{num}</button>))}</div></div>
-              <div className="flex-1 overflow-y-auto"><div className="mb-6"><span className="inline-block px-2 py-1 bg-green-100 text-green-700 text-xs font-bold rounded mb-2 uppercase">{selectedRecipe.category}</span><h2 className="text-2xl font-bold text-gray-800 mb-1">{selectedRecipe.name}</h2><p className="text-xs text-gray-400 mb-4">Amounts calculated for {servings} person(s)</p><div className="bg-green-50 p-5 rounded-2xl border border-green-100 mb-6 shadow-sm"><h3 className="font-bold text-green-800 mb-3 flex items-center gap-2"><BookOpen size={18} /> Ingredients</h3><p className="text-sm text-gray-700 leading-loose font-medium">{scaledMeasure}</p><div className="mt-4 pt-4 border-t border-green-200"><p className="text-xs font-bold text-green-800 mb-2 flex items-center gap-1"><ShoppingCart size={14} /> Add to Cart</p><div className="flex flex-wrap gap-2">{selectedRecipe.ingredients.map(ing => (<button key={ing} onClick={() => { onAddToCart(ing); alert(`Added ${ing} to cart!`); }} className="text-xs bg-white border border-green-200 text-green-700 px-2 py-1 rounded-md shadow-sm hover:bg-green-100 flex items-center gap-1 active:scale-95 transition-transform"><Plus size={10} /> {ing}</button>))}</div></div></div><div><h3 className="font-bold text-gray-700 mb-3 flex items-center gap-2"><ChefHat size={18} /> Instructions</h3><div className="space-y-4">{scaledSteps.map((step, idx) => (<div key={idx} className="flex gap-3"><div className="w-6 h-6 rounded-full bg-gray-800 text-white flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5">{idx + 1}</div><p className="text-sm text-gray-700 leading-relaxed pt-0.5">{step.replace(/^\d+\.\s*/, '')}</p></div>))}</div></div></div></div>
+              <div className="flex-1 overflow-y-auto"><div className="mb-6"><span className="inline-block px-2 py-1 bg-green-100 text-green-700 text-xs font-bold rounded mb-2 uppercase">{selectedRecipe.category}</span><h2 className="text-2xl font-bold text-gray-800 mb-1">{selectedRecipe.name}</h2><p className="text-xs text-gray-400 mb-4">Amounts calculated for {servings} person(s)</p><div className="bg-green-50 p-5 rounded-2xl border border-green-100 mb-6 shadow-sm"><h3 className="font-bold text-green-800 mb-3 flex items-center gap-2"><BookOpen size={18} /> Ingredients</h3><p className="text-sm text-gray-700 leading-loose font-medium">{scaledMeasure}</p><div className="mt-4 pt-4 border-t border-green-200"><p className="text-xs font-bold text-green-800 mb-2 flex items-center gap-1"><ShoppingCart size={14} /> Add to Cart</p>
+              
+              {/* 👇 수정된 버튼 매핑 부분 */}
+              <div className="flex flex-wrap gap-2">
+                  {selectedRecipe.ingredients.map(ing => (
+                    <button 
+                        key={ing} 
+                        onClick={() => handleAddSmoothly(ing)} 
+                        className={`text-xs px-2 py-1 rounded-md shadow-sm flex items-center gap-1 active:scale-95 transition-all ${addedItems[ing] ? 'bg-green-600 text-white border-green-600' : 'bg-white border border-green-200 text-green-700 hover:bg-green-100'}`}
+                    >
+                        {addedItems[ing] ? <Check size={10} /> : <Plus size={10} />} 
+                        {addedItems[ing] ? '담김!' : ing}
+                    </button>
+                  ))}
+              </div>
+
+              </div></div><div><h3 className="font-bold text-gray-700 mb-3 flex items-center gap-2"><ChefHat size={18} /> Instructions</h3><div className="space-y-4">{scaledSteps.map((step, idx) => (<div key={idx} className="flex gap-3"><div className="w-6 h-6 rounded-full bg-gray-800 text-white flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5">{idx + 1}</div><p className="text-sm text-gray-700 leading-relaxed pt-0.5">{step.replace(/^\d+\.\s*/, '')}</p></div>))}</div></div></div></div>
           </div>
       );
   }
@@ -1744,7 +1827,7 @@ function RecipeView({ ingredients, onAddToCart, recipes }) {
     </div>
   );
 }
-
+  
 // --- NEW: 실제 데이터 기반 통계 뷰 ---
 function InsightsView({ ingredients, onAddToCart, history, onResetHistory }) {
   // 1. 소비(Used)된 금액 총액 계산
