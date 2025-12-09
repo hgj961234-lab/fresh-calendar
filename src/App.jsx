@@ -97,6 +97,7 @@ const SHELF_LIFE_DB = {
   // 유제품 & 계란
   '우유': { fridge: 7, freezer: 30, price: 2800, unit: '1L', risk: { danger: 2, warning: 4 } }, 
   '달걀': { fridge: 30, freezer: 0, price: 8000, unit: '30구', risk: { danger: 3, warning: 7 } }, 
+  '계란': { fridge: 30, freezer: 0, price: 8000, unit: '30구', risk: { danger: 3, warning: 7 } }, 
   '요거트': { fridge: 10, freezer: 30, price: 4000, unit: '4개', risk: { danger: 2, warning: 5 } },
   '치즈': { fridge: 20, freezer: 180, price: 5500, unit: '10장', risk: { danger: 3, warning: 7 } },
   '모짜렐라치즈': { fridge: 7, freezer: 90, price: 11000, unit: '1kg', risk: { danger: 2, warning: 5 } },
@@ -1395,32 +1396,51 @@ function FridgeListView({ ingredients, getRiskLevel, moveToTrash, consumeItem, u
       setSelectedIds([]);
   }
 
-  // 💰 가격 자동 계산 헬퍼 함수
+  // 💰 가격 자동 계산 헬퍼 (검색 기능 강화됨)
   const calculateAutoPrice = (name, inputAmount, inputUnit) => {
-    const dbInfo = SHELF_LIFE_DB[name] || SHELF_LIFE_DB[name.replace(/\s/g, '')];
+    // 1. DB에서 정보 찾기 (공백 제거 및 다양한 시도)
+    const cleanName = name.replace(/\s+/g, ''); // 모든 공백 제거
+    const dbInfo = SHELF_LIFE_DB[name] || SHELF_LIFE_DB[cleanName] || SHELF_LIFE_DB['default'];
+    
+    // 가격 정보나 단위가 없으면 계산 불가 (기본값 리턴 방지)
     if (!dbInfo || !dbInfo.unit || !dbInfo.price) return null;
 
-    let dbAmount = parseFloat(dbInfo.unit.replace(/[^0-9.]/g, '')) || 1;
-    if (dbInfo.unit.includes('kg')) dbAmount *= 1000;
+    // 2. DB 기준 용량 파싱
+    let dbUnitStr = dbInfo.unit || '100g'; 
+    let dbAmount = parseFloat(dbUnitStr.replace(/[^0-9.]/g, '')) || 1;
+    
+    // DB 단위 변환
+    if (dbUnitStr.includes('kg')) dbAmount *= 1000;
+    else if (dbUnitStr.includes('L')) dbAmount *= 1000;
 
+    // 3. 사용자 입력 용량 파싱
     let currentAmount = parseFloat(inputAmount) || 0;
-    if (inputUnit === 'kg') currentAmount *= 1000;
+    
+    // 사용자 단위 변환
+    if (inputUnit === 'kg' || inputUnit === 'L') currentAmount *= 1000;
 
-    // 비례식: (DB가격 / DB용량) * 현재용량
+    // 4. 비례식 계산
+    if (dbAmount === 0) return dbInfo.price;
+
     const estimated = (dbInfo.price / dbAmount) * currentAmount;
-    return Math.round(estimated / 10) * 10; // 10원 단위 반올림
+    
+    // 10원 단위 반올림
+    return Math.round(estimated / 10) * 10;
   };
 
   // 🛠️ 수정 모달 (가격 연동 및 단위 자동 감지 포함)
   const EditModal = () => {
     if (!editingItem) return null;
     
-    // 🧠 [추가] 초기 단위 결정 로직 (DB 참고)
+    // 🧠 [냉장고 수정용] 초기 단위 결정
     const getInitialUnit = () => {
-        if (editingItem.unit) return editingItem.unit; // 이미 저장된게 있으면 그거 씀
-        const dbInfo = SHELF_LIFE_DB[editingItem.name] || SHELF_LIFE_DB[editingItem.name.replace(/\s/g, '')];
+        if (editingItem.unit) return editingItem.unit; 
+        
+        const cleanName = editingItem.name.replace(/\s+/g, '');
+        const dbInfo = SHELF_LIFE_DB[editingItem.name] || SHELF_LIFE_DB[cleanName];
+        
         if (dbInfo && dbInfo.unit) {
-            if (/[구개마리송이통단봉장]/.test(dbInfo.unit)) return '개';
+            if (/[구개알마리송이통단봉장]/.test(dbInfo.unit)) return '개';
             if (/[Lml]/.test(dbInfo.unit)) return 'ml';
         }
         return 'g';
@@ -1698,34 +1718,48 @@ function ShoppingCartView({ cart, onUpdateCount, onRemove, onCheckout, onUpdateD
   const toggleSelection = (name) => { if (selectedNames.includes(name)) setSelectedNames(selectedNames.filter(n => n !== name)); else setSelectedNames([...selectedNames, name]); };
   const toggleSelectAll = () => { if (selectedNames.length === cart.length && cart.length > 0) setSelectedNames([]); else setSelectedNames(cart.map(i => i.name)); };
 
-  // 🧠 [추가] DB 정보를 보고 알맞은 단위를 찾아주는 함수
+  // 🧠 [장바구니용] 초기 단위 결정
   const getDefaultUnit = (name) => {
-    const dbInfo = SHELF_LIFE_DB[name] || SHELF_LIFE_DB[name.replace(/\s/g, '')];
+    const cleanName = name.replace(/\s+/g, '');
+    const dbInfo = SHELF_LIFE_DB[name] || SHELF_LIFE_DB[cleanName]; // default는 제외 (정확한 매칭만)
+    
     if (!dbInfo || !dbInfo.unit) return 'g';
     
-    // DB 단위에 이런 글자가 있으면 '개'로 설정
-    if (/[구개마리송이통단봉장]/.test(dbInfo.unit)) return '개';
+    // '구', '개', '알' 등이 포함되면 '개'로 설정
+    if (/[구개알마리송이통단봉장]/.test(dbInfo.unit)) return '개';
     if (/[Lml]/.test(dbInfo.unit)) return 'ml';
     return 'g';
   };
 
-  // 💰 가격 자동 계산 헬퍼
+  // 💰 가격 자동 계산 헬퍼 (검색 기능 강화됨)
   const calculateAutoPrice = (name, inputAmount, inputUnit) => {
-    const dbInfo = SHELF_LIFE_DB[name] || SHELF_LIFE_DB[name.replace(/\s/g, '')];
+    // 1. DB에서 정보 찾기 (공백 제거 및 다양한 시도)
+    const cleanName = name.replace(/\s+/g, ''); // 모든 공백 제거
+    const dbInfo = SHELF_LIFE_DB[name] || SHELF_LIFE_DB[cleanName] || SHELF_LIFE_DB['default'];
+    
+    // 가격 정보나 단위가 없으면 계산 불가 (기본값 리턴 방지)
     if (!dbInfo || !dbInfo.unit || !dbInfo.price) return null;
 
-    let dbUnitStr = dbInfo.unit || '100g';
+    // 2. DB 기준 용량 파싱
+    let dbUnitStr = dbInfo.unit || '100g'; 
     let dbAmount = parseFloat(dbUnitStr.replace(/[^0-9.]/g, '')) || 1;
     
+    // DB 단위 변환
     if (dbUnitStr.includes('kg')) dbAmount *= 1000;
     else if (dbUnitStr.includes('L')) dbAmount *= 1000;
 
+    // 3. 사용자 입력 용량 파싱
     let currentAmount = parseFloat(inputAmount) || 0;
+    
+    // 사용자 단위 변환
     if (inputUnit === 'kg' || inputUnit === 'L') currentAmount *= 1000;
 
+    // 4. 비례식 계산
     if (dbAmount === 0) return dbInfo.price;
 
     const estimated = (dbInfo.price / dbAmount) * currentAmount;
+    
+    // 10원 단위 반올림
     return Math.round(estimated / 10) * 10;
   };
 
