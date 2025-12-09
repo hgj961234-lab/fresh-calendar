@@ -1178,8 +1178,14 @@ const resetHistory = async () => {
     await deleteDoc(doc(db, `users/${user.uid}/trash`, id));
   };
 
-  const updateItemExpiry = async (id, newDate) => {
-    try { await updateDoc(doc(db, `users/${user.uid}/ingredients`, id), { expiry: newDate }); } catch (e) { alert("수정 실패: " + e.message); }
+// 🟢 [수정] 이름, 유통기한, 가격, 용량 모두 수정 가능하도록 변경
+  const updateIngredient = async (id, data) => {
+    try { await updateDoc(doc(db, `users/${user.uid}/ingredients`, id), data); } catch (e) { alert("수정 실패: " + e.message); }
+  };
+
+  // 🟢 [추가] 장바구니 아이템의 상세 정보(용량, 가격) 수정 함수
+  const updateCartItemDetail = async (id, data) => {
+    await updateDoc(doc(db, `users/${user.uid}/cart`, id), data);
   };
 
   const updateCartCount = async (name, delta) => { 
@@ -1201,7 +1207,7 @@ const resetHistory = async () => {
     else await addDoc(collection(db, `users/${user.uid}/cart`), { name, count: 1 });
   };
 
-  const checkoutCartItems = async (selectedNames) => { 
+const checkoutCartItems = async (selectedNames) => { 
     const itemsToCheckout = cart.filter(item => selectedNames.includes(item.name));
     const batch = writeBatch(db);
 
@@ -1223,7 +1229,10 @@ const resetHistory = async () => {
           category: storage, 
           expiry: expiry, 
           addedDate: new Date(),
-          price: dbEntry.price || 0 // 장바구니에서 추가 시 기본 가격 적용
+          // 🟢 [수정] 장바구니에 입력된 가격/용량이 있으면 우선 사용
+          price: item.price !== undefined ? Number(item.price) : (dbEntry.price || 0),
+          amount: item.amount !== undefined ? Number(item.amount) : 0,
+          unit: item.unit || 'g'
         });
       }
       const cartRef = doc(db, `users/${user.uid}/cart`, item.id);
@@ -1266,10 +1275,12 @@ const resetHistory = async () => {
 
       <main className="flex-1 overflow-y-auto bg-gray-50 relative">
         {activeTab === 'calendar' && <CalendarView ingredients={ingredients} getRiskLevel={getRiskLevel} onDateSelect={(date) => { setSelectedDateForAdd(date); }} onAddRequest={(date) => { setSelectedDateForAdd(date); setActiveTab('add'); }} />}
-        {activeTab === 'list' && <FridgeListView ingredients={ingredients} getRiskLevel={getRiskLevel} moveToTrash={moveToTrash} consumeItem={consumeItem} updateItemExpiry={updateItemExpiry} onOpenTrash={() => setActiveTab('trash')} />}
+        {/* 🟢 [수정] updateIngredient 전달 */}
+        {activeTab === 'list' && <FridgeListView ingredients={ingredients} getRiskLevel={getRiskLevel} moveToTrash={moveToTrash} consumeItem={consumeItem} updateIngredient={updateIngredient} onOpenTrash={() => setActiveTab('trash')} />}
         {activeTab === 'trash' && <TrashView trashItems={trashItems} onRestore={restoreFromTrash} onPermanentDelete={permanentDelete} onClose={() => setActiveTab('list')} />}
         {activeTab === 'recipes' && <RecipeView ingredients={ingredients} onAddToCart={addToCart} recipes={RECIPE_FULL_DB} />}
-        {activeTab === 'cart' && <ShoppingCartView cart={cart} onUpdateCount={updateCartCount} onRemove={removeItemsFromCart} onCheckout={checkoutCartItems} />}
+        {/* 🟢 [수정] onUpdateDetail 전달 */}
+        {activeTab === 'cart' && <ShoppingCartView cart={cart} onUpdateCount={updateCartCount} onRemove={removeItemsFromCart} onCheckout={checkoutCartItems} onUpdateDetail={updateCartItemDetail} />}
         {activeTab === 'stats' && (<InsightsView ingredients={ingredients} onAddToCart={addToCart} history={historyItems} onResetHistory={resetHistory} // 👈 이 줄을 추가해서 함수를 전달합니다!
 />)}
         {activeTab === 'add' && <AddItemModal onClose={() => setActiveTab('calendar')} onAdd={addItem} initialDate={selectedDateForAdd} />}
@@ -1353,12 +1364,13 @@ function CalendarView({ ingredients, getRiskLevel, onAddRequest }) {
   );
 }
 
-// --- 냉장고 목록 뷰 (소비 vs 폐기 분리) ---
-function FridgeListView({ ingredients, getRiskLevel, moveToTrash, consumeItem, updateItemExpiry, onOpenTrash }) {
+// --- 냉장고 목록 뷰 (개별 선택 및 수정 기능 강화) ---
+function FridgeListView({ ingredients, getRiskLevel, moveToTrash, consumeItem, updateIngredient, onOpenTrash }) {
   const sorted = [...ingredients].sort((a,b) => (a.expiry || 0) - (b.expiry || 0));
   const [editingItem, setEditingItem] = useState(null);
   const [selectedIds, setSelectedIds] = useState([]);
 
+  // 개별 선택 로직
   const toggleSelect = (id) => {
     if (selectedIds.includes(id)) setSelectedIds(selectedIds.filter(itemId => itemId !== id));
     else setSelectedIds([...selectedIds, id]);
@@ -1383,17 +1395,45 @@ function FridgeListView({ ingredients, getRiskLevel, moveToTrash, consumeItem, u
       setSelectedIds([]);
   }
 
+  // 🛠️ 수정 모달 (가격, 용량 추가됨)
   const EditModal = () => {
     if (!editingItem) return null;
     const initialDate = editingItem.expiry ? new Date(editingItem.expiry).toISOString().split('T')[0] : new Date().toISOString().split('T')[0];
+    
+    // 로컬 상태 관리
     const [date, setDate] = useState(initialDate);
+    const [price, setPrice] = useState(editingItem.price || 0);
+    const [amount, setAmount] = useState(editingItem.amount || 0);
+    const [unit, setUnit] = useState(editingItem.unit || 'g');
+
     return (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-6" onClick={() => setEditingItem(null)}>
             <div className="bg-white rounded-2xl w-full max-w-sm p-6" onClick={e => e.stopPropagation()}>
-                <h3 className="text-lg font-bold mb-4">유통기한 수정</h3>
+                <h3 className="text-lg font-bold mb-4">재료 정보 수정</h3>
                 <div className="mb-4"><span className="text-gray-500 text-xs">제품명</span><div className="font-bold text-xl">{editingItem.name}</div></div>
-                <div className="mb-6"><label className="block text-sm text-gray-600 mb-2">새로운 날짜</label><input type="date" value={date} onChange={e => setDate(e.target.value)} className="w-full p-3 border rounded-xl text-lg bg-gray-50" /></div>
-                <button onClick={() => { updateItemExpiry(editingItem.id, new Date(date)); setEditingItem(null); }} className="w-full bg-green-600 text-white py-3 rounded-xl font-bold">수정 완료</button>
+                
+                <div className="flex gap-2 mb-4">
+                   <div className="flex-1">
+                     <label className="block text-sm text-gray-600 mb-1">가격 (원)</label>
+                     <input type="number" value={price} onChange={e => setPrice(e.target.value)} className="w-full p-2 border rounded-lg bg-gray-50" />
+                   </div>
+                   <div className="flex-1">
+                     <label className="block text-sm text-gray-600 mb-1">용량</label>
+                     <div className="flex gap-1">
+                        <input type="number" value={amount} onChange={e => setAmount(e.target.value)} className="w-full p-2 border rounded-lg bg-gray-50" />
+                        <select value={unit} onChange={e=>setUnit(e.target.value)} className="p-2 border rounded-lg bg-gray-50 text-sm">
+                            <option value="g">g</option><option value="kg">kg</option><option value="ml">ml</option><option value="개">개</option>
+                        </select>
+                     </div>
+                   </div>
+                </div>
+
+                <div className="mb-6"><label className="block text-sm text-gray-600 mb-2">유통기한</label><input type="date" value={date} onChange={e => setDate(e.target.value)} className="w-full p-3 border rounded-xl text-lg bg-gray-50" /></div>
+                
+                <button onClick={() => { 
+                    updateIngredient(editingItem.id, { expiry: new Date(date), price: Number(price), amount: Number(amount), unit }); 
+                    setEditingItem(null); 
+                }} className="w-full bg-green-600 text-white py-3 rounded-xl font-bold">저장하기</button>
             </div>
         </div>
     );
@@ -1428,7 +1468,7 @@ function FridgeListView({ ingredients, getRiskLevel, moveToTrash, consumeItem, u
           </>
         )}
       </div>
-       
+        
       <div className="space-y-3">
         {sorted.map(item => {
           const risk = getRiskLevel(item.expiry, item.name);
@@ -1436,39 +1476,38 @@ function FridgeListView({ ingredients, getRiskLevel, moveToTrash, consumeItem, u
           const isSelected = selectedIds.includes(item.id);
 
           return (
-            <div key={item.id} className={`... (생략) ...`}>
+            <div key={item.id} className={`bg-white p-3 rounded-2xl border shadow-sm transition-all flex items-center justify-between group ${isSelected ? 'ring-2 ring-green-500 bg-green-50' : 'hover:border-green-300'}`}>
               <div className="flex items-center gap-3 flex-1 cursor-pointer" onClick={() => toggleSelect(item.id)}>
-                {/* ... (체크박스, 색깔 띠 부분 생략) ... */}
+                {/* 체크박스 UI */}
+                <div className={`text-gray-300 transition-colors ${isSelected ? 'text-green-600' : 'group-hover:text-gray-400'}`}>
+                    {isSelected ? <CheckSquare size={20} /> : <Square size={20} />}
+                </div>
                 
-                {/* 🔻 [여기입니다!] 이 부분을 수정하세요 🔻 */}
+                <div className={`w-1.5 h-10 rounded-full ${risk === 'danger' ? 'bg-red-500' : risk === 'warning' ? 'bg-yellow-400' : 'bg-green-400'}`}></div>
+                
                 <div>
                   <h3 className="font-bold text-gray-800 flex items-center gap-1">
                     {item.name}
-                    {/* 👇 그람(g)수 표시 코드 추가됨 👇 */}
                     {item.amount > 0 && (
-                      <span className="text-sm font-normal text-green-600">
-                        ({item.amount}{item.unit || 'g'})
+                      <span className="text-xs font-normal text-green-700 bg-green-100 px-1.5 rounded">
+                        {item.amount}{item.unit}
                       </span>
                     )}
                   </h3>
                   
-                  {/* 가격 표시 */}
                   <p className="text-xs text-gray-400 font-medium">
-                    {item.price ? `${new Intl.NumberFormat('ko-KR').format(item.price)}원` : '가격 미입력'}
+                    {item.price ? `${new Intl.NumberFormat('ko-KR').format(item.price)}원` : '0원'}
                   </p>
                   
-                  {/* 날짜 표시 */}
                   <p className={`text-xs ${risk === 'danger' ? 'text-red-500 font-bold' : 'text-gray-500'}`}>
                     {diff < 0 ? '만료됨' : diff === 0 ? '오늘 만료' : `${diff}일 남음`} 
                     ({item.expiry ? item.expiry.toLocaleDateString() : '?'})
                   </p>
                 </div>
               </div>
-              <div className="flex gap-2">
-                <button onClick={(e) => { e.stopPropagation(); setEditingItem(item); }} className="text-gray-300 hover:text-green-600 p-2"><Edit2 size={18} /></button>
-                {/* 개별 아이템 액션 */}
-                <button onClick={(e) => { e.stopPropagation(); consumeItem([item.id]); }} className="text-green-200 hover:text-green-600 p-2" title="사용/먹음"><Utensils size={18} /></button>
-                <button onClick={(e) => { e.stopPropagation(); moveToTrash([item.id]); }} className="text-red-200 hover:text-red-500 p-2" title="폐기/버림"><Trash2 size={18} /></button>
+
+              <div className="flex gap-1">
+                <button onClick={(e) => { e.stopPropagation(); setEditingItem(item); }} className="text-gray-300 hover:text-green-600 p-2 bg-gray-50 rounded-lg"><Edit2 size={16} /></button>
               </div>
             </div>
           );
@@ -1575,8 +1614,8 @@ function AddItemModal({ onClose, onAdd, initialDate }) {
   );
 }
 
-// --- 장바구니 뷰 ---
-function ShoppingCartView({ cart, onUpdateCount, onRemove, onCheckout }) {
+// --- 장바구니 뷰 (가격/용량 입력 추가) ---
+function ShoppingCartView({ cart, onUpdateCount, onRemove, onCheckout, onUpdateDetail }) {
   const [selectedNames, setSelectedNames] = useState([]);
   const toggleSelection = (name) => { if (selectedNames.includes(name)) setSelectedNames(selectedNames.filter(n => n !== name)); else setSelectedNames([...selectedNames, name]); };
   const toggleSelectAll = () => { if (selectedNames.length === cart.length && cart.length > 0) setSelectedNames([]); else setSelectedNames(cart.map(i => i.name)); };
@@ -1587,7 +1626,55 @@ function ShoppingCartView({ cart, onUpdateCount, onRemove, onCheckout }) {
       {cart.length === 0 ? <div className="text-center py-20 text-gray-400">장바구니가 비었습니다.</div> : (
         <div className="space-y-3">
           <div className="flex items-center justify-between mb-2"><button onClick={toggleSelectAll} className="flex items-center gap-2 text-sm text-gray-600"><CheckSquare size={18} /> 전체 선택</button>{selectedNames.length > 0 && <button onClick={()=>onRemove(selectedNames)} className="text-xs text-red-500">선택 삭제</button>}</div>
-          {cart.map(item => (<div key={item.name} className="bg-white p-4 rounded-xl border flex justify-between items-center shadow-sm"><div className="flex items-center gap-3"><button onClick={()=>toggleSelection(item.name)}>{selectedNames.includes(item.name) ? <CheckSquare className="text-green-600"/> : <Square className="text-gray-300"/>}</button><span className="font-bold">{item.name}</span></div><div className="flex items-center bg-gray-100 rounded-lg"><button onClick={() => onUpdateCount(item.name, -1)} className="p-1 px-2">-</button><span className="px-2 text-sm font-bold">{item.count}</span><button onClick={() => onUpdateCount(item.name, 1)} className="p-1 px-2">+</button></div></div>))}
+          {cart.map(item => (
+            <div key={item.id} className="bg-white p-4 rounded-xl border shadow-sm space-y-3">
+                {/* 상단: 선택 및 이름, 수량 */}
+                <div className="flex justify-between items-center">
+                    <div className="flex items-center gap-3">
+                        <button onClick={()=>toggleSelection(item.name)}>{selectedNames.includes(item.name) ? <CheckSquare className="text-green-600"/> : <Square className="text-gray-300"/>}</button>
+                        <span className="font-bold text-lg">{item.name}</span>
+                    </div>
+                    <div className="flex items-center bg-gray-100 rounded-lg">
+                        <button onClick={() => onUpdateCount(item.name, -1)} className="p-1 px-2">-</button>
+                        <span className="px-2 text-sm font-bold">{item.count}</span>
+                        <button onClick={() => onUpdateCount(item.name, 1)} className="p-1 px-2">+</button>
+                    </div>
+                </div>
+
+                {/* 하단: 가격 및 용량 입력 (여기서 입력한 값이 냉장고로 넘어감) */}
+                <div className="flex gap-2 bg-gray-50 p-2 rounded-lg">
+                    <div className="flex-1">
+                        <label className="text-[10px] text-gray-500 block">예상 가격(원)</label>
+                        <input 
+                            type="number" 
+                            placeholder="3000"
+                            value={item.price || ''} 
+                            onChange={(e) => onUpdateDetail(item.id, { price: e.target.value })} 
+                            className="w-full bg-white border rounded px-1 py-1 text-sm outline-none focus:border-green-500"
+                        />
+                    </div>
+                    <div className="flex-1">
+                        <label className="text-[10px] text-gray-500 block">용량(g/개)</label>
+                        <div className="flex gap-1">
+                            <input 
+                                type="number" 
+                                placeholder="500"
+                                value={item.amount || ''} 
+                                onChange={(e) => onUpdateDetail(item.id, { amount: e.target.value })} 
+                                className="w-full bg-white border rounded px-1 py-1 text-sm outline-none focus:border-green-500"
+                            />
+                            <select 
+                                value={item.unit || 'g'} 
+                                onChange={(e) => onUpdateDetail(item.id, { unit: e.target.value })}
+                                className="bg-white border rounded text-xs"
+                            >
+                                <option value="g">g</option><option value="kg">kg</option><option value="ml">ml</option><option value="개">개</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </div>
+          ))}
           <button onClick={()=>onCheckout(selectedNames)} disabled={selectedNames.length===0} className="w-full bg-green-600 text-white py-3 rounded-xl font-bold mt-4 disabled:bg-gray-300">냉장고로 이동</button>
         </div>
       )}
