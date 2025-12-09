@@ -1268,7 +1268,7 @@ const resetHistory = async () => {
         {activeTab === 'calendar' && <CalendarView ingredients={ingredients} getRiskLevel={getRiskLevel} onDateSelect={(date) => { setSelectedDateForAdd(date); }} onAddRequest={(date) => { setSelectedDateForAdd(date); setActiveTab('add'); }} />}
         {activeTab === 'list' && <FridgeListView ingredients={ingredients} getRiskLevel={getRiskLevel} moveToTrash={moveToTrash} consumeItem={consumeItem} updateItemExpiry={updateItemExpiry} onOpenTrash={() => setActiveTab('trash')} />}
         {activeTab === 'trash' && <TrashView trashItems={trashItems} onRestore={restoreFromTrash} onPermanentDelete={permanentDelete} onClose={() => setActiveTab('list')} />}
-        {activeTab === 'recipes' && <RecipeView ingredients={ingredients} onAddToCart={addToCart} />}
+        {activeTab === 'recipes' && <RecipeView ingredients={ingredients} onAddToCart={addToCart} recipes={RECIPE_FULL_DB} />}
         {activeTab === 'cart' && <ShoppingCartView cart={cart} onUpdateCount={updateCartCount} onRemove={removeItemsFromCart} onCheckout={checkoutCartItems} />}
         {activeTab === 'stats' && (<InsightsView ingredients={ingredients} onAddToCart={addToCart} history={historyItems} onResetHistory={resetHistory} // 👈 이 줄을 추가해서 함수를 전달합니다!
 />)}
@@ -1659,7 +1659,7 @@ function RecipeView({ ingredients, onAddToCart, recipes }) {
 }
 
 // --- NEW: 실제 데이터 기반 통계 뷰 ---
-function InsightsView({ ingredients, onAddToCart, history }) {
+function InsightsView({ ingredients, onAddToCart, history, onResetHistory }) {
   // 1. 소비(Used)된 금액 총액 계산
   const totalUsed = history.filter(h => h.action === 'used').reduce((sum, item) => sum + (item.price || 0), 0);
   
