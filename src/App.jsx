@@ -1418,7 +1418,7 @@ function AppContent({ user }) {
           </nav>
         </div>
 
-        {/* 3. 오른쪽: PC 전용 대시보드 (통계 컴포넌트 재사용) */}
+        {/* 3. 오른쪽: PC 전용 대시보드 (통계 컴포넌트 재사용 및 가로 배치 적용) */}
         <div className="hidden md:flex flex-col gap-6 h-[85vh] flex-1">
            <div className="bg-white rounded-[30px] shadow-xl p-8 flex-1 overflow-y-auto">
               <h2 className="text-2xl font-bold mb-6 text-gray-800 flex items-center gap-2"><TrendingUp className="text-green-600" /> 나의 키친 대시보드</h2>
@@ -1443,7 +1443,6 @@ function AppContent({ user }) {
     </div>
   );
 }
-
 // NavBtn 컴포넌트는 기존 파일 맨 아래에 있는 거 그대로 쓰면 돼!
 
 // --- 캘린더 뷰 ---
@@ -1917,11 +1916,14 @@ function ShoppingCartView({ cart, ingredients, onUpdateCount, onRemove, onChecko
   );
 }
 
-// --- RecipeView: 생략 없음, 모든 기능 포함 ---
+// --- RecipeView: 냉장고 털기 필터 & 임박 재료 추천 기능 탑재 ---
 function RecipeView({ ingredients, onAddToCart, recipes, user }) {
   const [activeTab, setActiveTab] = useState('default'); 
   const [myRecipes, setMyRecipes] = useState([]);
   
+  // 🟢 [New] 냉파 필터 상태
+  const [isFridgeClearingMode, setIsFridgeClearingMode] = useState(false);
+
   // 리스트 필터링용 상태
   const [selectedIngredients, setSelectedIngredients] = useState([]);
   const [selectedRecipe, setSelectedRecipe] = useState(null);
@@ -1932,7 +1934,7 @@ function RecipeView({ ingredients, onAddToCart, recipes, user }) {
   const [isCookingMode, setIsCookingMode] = useState(false);
   const [currentStep, setCurrentStep] = useState(0);
 
-  // 1. 내 레시피 불러오기 (Firebase)
+  // 1. 내 레시피 불러오기
   useEffect(() => {
     if(!user) return;
     const q = query(collection(db, `users/${user.uid}/recipes`));
@@ -1942,9 +1944,10 @@ function RecipeView({ ingredients, onAddToCart, recipes, user }) {
     return () => unsub();
   }, [user]);
 
-  // 2. 레시피 열 때 '없는 재료' 자동 선택
+  // 2. 레시피 열 때 '없는 재료'만 자동으로 선택 (스마트 체크)
   useEffect(() => {
     if (selectedRecipe) {
+        // 내가 없는 재료만 true (구매 목록)
         const missing = selectedRecipe.ingredients.filter(ing => 
             !ingredients.some(myIng => matchIngredient(ing, myIng.name))
         );
@@ -1952,7 +1955,7 @@ function RecipeView({ ingredients, onAddToCart, recipes, user }) {
     }
   }, [selectedRecipe, ingredients]);
 
-  // 3. 재료명 매칭 헬퍼 (공백 제거 후 비교)
+  // 3. 재료명 매칭 헬퍼
   const matchIngredient = (r, u) => { 
       const rr = r.replace(/\s/g,'');
       const uu = u.replace(/\s/g,''); 
@@ -1960,7 +1963,21 @@ function RecipeView({ ingredients, onAddToCart, recipes, user }) {
       return rr.includes(uu) || uu.includes(rr); 
   };
 
-  // 4. 재료 칩 선택 토글 함수
+  // 4. 유통기한 임박도 계산 (3일 이내면 점수 높음)
+  const getIngredientUrgency = (ingName) => {
+    const matchedItems = ingredients.filter(i => matchIngredient(ingName, i.name));
+    if (matchedItems.length === 0) return 0;
+    
+    // 하나라도 유통기한이 3일 이내라면 긴급(Danger)
+    const hasDanger = matchedItems.some(i => {
+       const today = new Date(); today.setHours(0,0,0,0);
+       const exp = new Date(i.expiry); exp.setHours(0,0,0,0);
+       const diff = Math.ceil((exp - today) / (1000 * 60 * 60 * 24));
+       return diff >= 0 && diff <= 3;
+    });
+    return hasDanger ? 100 : 1; // 임박 재료는 가중치 100점 부여 (무조건 상단 노출)
+  };
+
   const toggleIngredientToBuy = (ingName) => {
       if (ingredientsToBuy.includes(ingName)) {
           setIngredientsToBuy(prev => prev.filter(i => i !== ingName));
@@ -1969,37 +1986,28 @@ function RecipeView({ ingredients, onAddToCart, recipes, user }) {
       }
   };
 
-  // 5. 텍스트에서 용량(숫자)과 단위 추출 (정규식)
   const extractAmountAndUnit = (ingName, measureText) => {
       if (!measureText) return { amount: 0, unit: 'g' };
-      
       try {
-        // 재료명 근처의 숫자와 단위를 찾음
         const regex = new RegExp(`${ingName}.*?([0-9.]+)\\s*(g|kg|ml|L|개|봉|t|T|컵|쪽|마리)`, 'i');
         const match = measureText.match(regex);
-        
         if (match) {
             let amount = parseFloat(match[1]);
-            // 인분 수에 맞춰 곱하기
             amount = amount * servings;
             return { 
                 amount: Number.isInteger(amount) ? amount : Number(amount.toFixed(1)), 
                 unit: match[2] 
             };
         }
-      } catch (e) {
-          console.error("Regex parsing error", e);
-      }
+      } catch (e) { console.error("Regex parsing error", e); }
       return { amount: 0, unit: 'g' };
   };
 
-  // 6. 선택한 재료 장바구니 담기
   const handleAddSelectedToCart = () => {
       if(ingredientsToBuy.length === 0) {
-          toast.error('담을 재료를 선택해주세요!');
+          toast.error('담을 재료가 없습니다.');
           return;
       }
-      
       let addedCount = 0;
       ingredientsToBuy.forEach(item => {
           const { amount, unit } = extractAmountAndUnit(item, selectedRecipe.measure);
@@ -2009,18 +2017,14 @@ function RecipeView({ ingredients, onAddToCart, recipes, user }) {
       toast.success(`${addedCount}개 재료를 장바구니에 담았습니다!`);
   };
 
-  // 7. 인분 조절용 텍스트 변환
   const scaleText = (text, factor) => {
      if (factor === 1 || !text) return text;
-     // 텍스트 내의 모든 숫자를 찾아서 곱함
      return text.replace(/(\d+(\.\d+)?)/g, (match) => {
         const num = parseFloat(match);
-        // 날짜 같은 큰 숫자는 제외하는 게 좋지만, 일단 단순 곱하기 적용
         return Number.isInteger(num * factor) ? (num * factor) : (num * factor).toFixed(1);
      });
   };
 
-  // 8. 조리 모드 토글 (화면 꺼짐 방지)
   const toggleCookingMode = async () => {
      if (!isCookingMode) {
         try {
@@ -2036,13 +2040,11 @@ function RecipeView({ ingredients, onAddToCart, recipes, user }) {
      }
   };
 
-  // 9. 나만의 레시피 추가 (사용자 입력)
   const addMyRecipe = async () => {
     const name = prompt("🍳 레시피 이름이 무엇인가요?");
     if(!name) return;
     const ingreds = prompt("🥕 필요한 재료를 쉼표(,)로 구분해 적어주세요\n(예: 김치, 돼지고기, 두부)");
-    const steps = prompt("📝 조리법을 단계별로 적어주세요 (줄바꿈이 안되니 1. 2. 번호를 붙여주세요)");
-    
+    const steps = prompt("📝 조리법을 단계별로 적어주세요");
     try {
         await addDoc(collection(db, `users/${user.uid}/recipes`), {
             name, category: 'My',
@@ -2054,59 +2056,53 @@ function RecipeView({ ingredients, onAddToCart, recipes, user }) {
     } catch(e) { toast.error('저장 실패'); }
   };
 
-  // 10. 유통기한 임박도 계산 (정렬용)
-  const getIngredientUrgency = (ingName) => {
-    const matchedItems = ingredients.filter(i => matchIngredient(ingName, i.name));
-    if (matchedItems.length === 0) return 0;
-    const hasDanger = matchedItems.some(i => {
-       const today = new Date(); today.setHours(0,0,0,0);
-       const exp = new Date(i.expiry); exp.setHours(0,0,0,0);
-       const diff = (exp - today) / (1000 * 60 * 60 * 24);
-       return diff <= 3;
-    });
-    return hasDanger ? 5 : 1; 
-  };
-  
-  // 11. 레시피 정렬 로직 (보유 재료 + 임박 재료 우선)
+  // 🟢 [Logic] 레시피 정렬 및 필터링 핵심 로직
   const allRecipes = activeTab === 'default' ? recipes : myRecipes;
   
-  const matchedRecipes = allRecipes.map(recipe => {
+  let matchedRecipes = allRecipes.map(recipe => {
+      // 보유 재료 확인
       const existing = recipe.ingredients.filter(req => selectedIngredients.some(sel => matchIngredient(req, sel)));
       const missing = recipe.ingredients.filter(req => !selectedIngredients.some(sel => matchIngredient(req, sel)));
       
+      // 긴급 점수 계산 (임박 재료 포함 시 점수 폭발적 증가)
       let urgencyScore = 0;
-      recipe.ingredients.forEach(ing => { if(selectedIngredients.includes(ing)) urgencyScore += getIngredientUrgency(ing); });
+      // 내가 가진 재료들 중에서, 이 레시피에 쓰이는 것들의 긴급도 합산
+      ingredients.forEach(myIng => {
+          if (recipe.ingredients.some(req => matchIngredient(req, myIng.name))) {
+              urgencyScore += getIngredientUrgency(myIng.name);
+          }
+      });
       
-      return { ...recipe, existing, missing, score: existing.length + urgencyScore };
-  }).sort((a, b) => b.score - a.score);
+      return { ...recipe, existing, missing, urgencyScore, score: existing.length + urgencyScore };
+  });
 
-  // 리스트 필터링용 토글 함수
+  // 냉파 필터가 켜져있으면, 유통기한 임박 재료(100점 이상)가 포함된 레시피만 남김
+  if (isFridgeClearingMode) {
+      matchedRecipes = matchedRecipes.filter(r => r.urgencyScore >= 100);
+  }
+
+  // 정렬: 점수 높은 순 (임박 재료 포함 > 보유 재료 많음)
+  matchedRecipes.sort((a, b) => b.score - a.score);
+
   const toggleSelection = (name) => { if (selectedIngredients.includes(name)) setSelectedIngredients(selectedIngredients.filter(i => i !== name)); else setSelectedIngredients([...selectedIngredients, name]); };
   const toggleSelectAll = () => { if (selectedIngredients.length === ingredients.length && ingredients.length > 0) setSelectedIngredients([]); else setSelectedIngredients(ingredients.map(i => i.name)); };
 
 
-  // ------------------------------------------------
-  // [VIEW 1] 조리 모드 (전체 화면 슬라이드)
-  // ------------------------------------------------
+  // [VIEW 1] 조리 모드
   if (isCookingMode && selectedRecipe) {
      const scaledSteps = selectedRecipe.steps.map(s => scaleText(s, servings));
      return (
         <div className="fixed inset-0 z-50 bg-gray-900 text-white flex flex-col animate-in fade-in duration-300">
-           {/* 상단 컨트롤 바 */}
            <div className="flex justify-between items-center p-6 border-b border-gray-700">
               <h2 className="text-xl font-bold truncate pr-4">{selectedRecipe.name} (Step {currentStep + 1}/{scaledSteps.length})</h2>
               <button onClick={toggleCookingMode} className="bg-red-600 px-4 py-2 rounded-lg font-bold text-sm flex items-center gap-1 hover:bg-red-700"><X size={16}/> 종료</button>
            </div>
-           
-           {/* 메인 텍스트 */}
            <div className="flex-1 flex items-center justify-center p-8 text-center">
               <div className="max-w-2xl">
                  <span className="inline-block bg-green-600 text-2xl font-bold rounded-full w-16 h-16 flex items-center justify-center mb-6 mx-auto shadow-lg shadow-green-900/50">{currentStep + 1}</span>
                  <p className="text-2xl md:text-4xl font-bold leading-relaxed whitespace-pre-wrap">{scaledSteps[currentStep]}</p>
               </div>
            </div>
-
-           {/* 하단 네비게이션 */}
            <div className="p-8 pb-10 flex justify-between items-center bg-gray-800">
               <button disabled={currentStep===0} onClick={()=>setCurrentStep(prev=>prev-1)} className="flex items-center gap-2 text-lg font-bold disabled:opacity-30 hover:text-green-400"><ChevronLeft size={30}/> 이전</button>
               <button disabled={currentStep===scaledSteps.length-1} onClick={()=>setCurrentStep(prev=>prev+1)} className="flex items-center gap-2 text-lg font-bold disabled:opacity-30 hover:text-green-400">다음 <ChevronRight size={30}/></button>
@@ -2115,70 +2111,51 @@ function RecipeView({ ingredients, onAddToCart, recipes, user }) {
      );
   }
 
-  // ------------------------------------------------
-  // [VIEW 2] 레시피 상세 화면 (스크롤 뷰)
-  // ------------------------------------------------
+  // [VIEW 2] 상세 보기
   if (selectedRecipe) {
       return (
-        <div className="p-4 pb-24 h-full bg-white dark:bg-gray-900 flex flex-col overflow-y-auto transition-colors">
-            {/* 상단 네비게이션 (플로팅 제거됨) */}
-            <div className="bg-white dark:bg-gray-900 pb-4 border-b dark:border-gray-700 mb-4">
-               <button onClick={() => { setSelectedRecipe(null); setServings(1); }} className="text-gray-500 dark:text-gray-400 flex items-center gap-2 mb-2 hover:text-green-600 font-bold">
+        <div className="p-4 pb-24 h-full bg-white flex flex-col overflow-y-auto">
+            <div className="bg-white pb-4 border-b mb-4 sticky top-0 z-10">
+               <button onClick={() => { setSelectedRecipe(null); setServings(1); }} className="text-gray-500 flex items-center gap-2 mb-2 hover:text-green-600 font-bold">
                    <ArrowLeft size={20}/> 목록으로 돌아가기
                </button>
                <div className="flex justify-between items-end">
-                  <h2 className="text-3xl font-bold text-gray-800 dark:text-white">{selectedRecipe.name}</h2>
+                  <h2 className="text-3xl font-bold text-gray-800">{selectedRecipe.name}</h2>
                   <button onClick={toggleCookingMode} className="bg-green-600 text-white px-4 py-2 rounded-xl font-bold text-sm shadow-md hover:bg-green-700 flex items-center gap-2 animate-pulse">
-                     <MonitorPlay size={18}/> 요리 시작
+                      <MonitorPlay size={18}/> 요리 시작
                   </button>
                </div>
                <div className="flex gap-2 mt-2">
                    <span className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full font-bold">{selectedRecipe.category}</span>
-                   <span className="bg-gray-100 dark:bg-gray-700 dark:text-gray-300 text-gray-600 text-xs px-2 py-1 rounded-full">재료 {selectedRecipe.ingredients.length}개</span>
+                   <span className="bg-gray-100 text-gray-600 text-xs px-2 py-1 rounded-full">재료 {selectedRecipe.ingredients.length}개</span>
                </div>
             </div>
             
-            {/* 인분 조절기 (디자인 깨짐 방지 적용) */}
-            <div className="bg-green-50 dark:bg-gray-800 p-4 rounded-2xl mb-6 border border-green-100 dark:border-gray-700 flex items-center justify-between">
-               <span className="font-bold text-green-800 dark:text-green-400 flex items-center gap-2"><Users size={18}/> 기준 인원</span>
-               <div className="flex items-center bg-white dark:bg-gray-700 rounded-lg shadow-sm">
-                  <button onClick={() => setServings(Math.max(1, servings - 1))} className="p-2 px-3 hover:bg-gray-100 dark:hover:bg-gray-600 rounded-l-lg dark:text-white">-</button>
-                  <span className="px-2 min-w-[4rem] text-center font-bold text-lg dark:text-white whitespace-nowrap">{servings}인분</span>
-                  <button onClick={() => setServings(servings + 1)} className="p-2 px-3 hover:bg-gray-100 dark:hover:bg-gray-600 rounded-r-lg dark:text-white">+</button>
+            <div className="bg-green-50 p-4 rounded-2xl mb-6 border border-green-100 flex items-center justify-between">
+               <span className="font-bold text-green-800 flex items-center gap-2"><Users size={18}/> 기준 인원</span>
+               <div className="flex items-center bg-white rounded-lg shadow-sm">
+                  <button onClick={() => setServings(Math.max(1, servings - 1))} className="p-2 px-3 hover:bg-gray-100 rounded-l-lg">-</button>
+                  <span className="px-2 min-w-[4rem] text-center font-bold text-lg whitespace-nowrap">{servings}인분</span>
+                  <button onClick={() => setServings(servings + 1)} className="p-2 px-3 hover:bg-gray-100 rounded-r-lg">+</button>
                </div>
             </div>
 
-            {/* 재료 선택 및 장바구니 담기 */}
             <div className="mb-8">
                 <div className="flex justify-between items-center mb-3">
-                    <h3 className="text-lg font-bold flex items-center gap-2 dark:text-white"><ShoppingCart size={18}/> 재료 선택</h3>
+                    <h3 className="text-lg font-bold flex items-center gap-2"><ShoppingCart size={18}/> 재료 선택</h3>
                     <button onClick={handleAddSelectedToCart} className="text-xs bg-green-600 text-white px-3 py-1.5 rounded-lg font-bold shadow-md hover:bg-green-700 transition-colors flex items-center gap-1">
                         <Plus size={12}/> 선택한 {ingredientsToBuy.length}개 장바구니 담기
                     </button>
                 </div>
-                
-                {/* 재료량 설명 (인분 수에 따라 자동 계산) */}
-                <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-2xl text-sm text-gray-700 dark:text-gray-300 leading-relaxed mb-4 whitespace-pre-line">
+                <div className="bg-gray-50 p-4 rounded-2xl text-sm text-gray-700 leading-relaxed mb-4 whitespace-pre-line">
                     {scaleText(selectedRecipe.measure, servings)}
                 </div>
-
-                {/* 재료 칩 리스트 (클릭하여 선택/해제) */}
                 <div className="flex flex-wrap gap-2">
                     {selectedRecipe.ingredients.map((ing, i) => {
                         const have = ingredients.some(myIng => matchIngredient(ing, myIng.name));
                         const willBuy = ingredientsToBuy.includes(ing);
                         return (
-                            <button 
-                                key={i} 
-                                onClick={() => toggleIngredientToBuy(ing)}
-                                className={`px-3 py-1.5 rounded-full text-xs font-medium border flex items-center gap-1 transition-all
-                                    ${have 
-                                        ? 'bg-gray-100 text-gray-400 border-gray-200 dark:bg-gray-700 dark:text-gray-500 line-through decoration-1' 
-                                        : willBuy 
-                                            ? 'bg-blue-50 border-blue-500 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-400 ring-1 ring-blue-500' 
-                                            : 'bg-white text-gray-500 border-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-600 hover:border-blue-300'
-                                    }`}
-                            >
+                            <button key={i} onClick={() => toggleIngredientToBuy(ing)} className={`px-3 py-1.5 rounded-full text-xs font-medium border flex items-center gap-1 transition-all ${have ? 'bg-gray-100 text-gray-400 border-gray-200 line-through decoration-1' : willBuy ? 'bg-blue-50 border-blue-500 text-blue-700 ring-1 ring-blue-500' : 'bg-white text-gray-500 border-gray-200 hover:border-blue-300'}`}>
                                 {willBuy && !have && <Check size={10} strokeWidth={3} />}
                                 {ing}
                                 {have && <span className="text-[10px] ml-1">(보유)</span>}
@@ -2189,38 +2166,42 @@ function RecipeView({ ingredients, onAddToCart, recipes, user }) {
                 <p className="text-[10px] text-gray-400 mt-2 ml-1 text-right">* 파란색 테두리가 장바구니에 담길 재료입니다.</p>
             </div>
 
-            {/* 조리 순서 */}
             <div className="mb-8">
-               <h3 className="text-lg font-bold flex items-center gap-2 mb-4 dark:text-white"><ChefHat size={18}/> 조리 순서</h3>
+               <h3 className="text-lg font-bold flex items-center gap-2 mb-4"><ChefHat size={18}/> 조리 순서</h3>
                <div className="space-y-4">
                    {selectedRecipe.steps && selectedRecipe.steps.length > 0 ? (
                        selectedRecipe.steps.map((step, index) => (
                            <div key={index} className="flex gap-4">
                                <div className="flex-shrink-0 w-8 h-8 bg-green-600 text-white rounded-full flex items-center justify-center font-bold text-sm shadow-md">{index + 1}</div>
-                               <div className="flex-1 bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4 rounded-2xl shadow-sm text-gray-700 dark:text-gray-300 leading-relaxed">
+                               <div className="flex-1 bg-white border border-gray-100 p-4 rounded-2xl shadow-sm text-gray-700 leading-relaxed">
                                    {scaleText(step, servings)}
                                </div>
                            </div>
                        ))
-                   ) : (
-                       <div className="text-center text-gray-400 py-10 bg-gray-50 dark:bg-gray-800 rounded-2xl">조리 순서 정보가 없습니다.</div>
-                   )}
+                   ) : <div className="text-center text-gray-400 py-10 bg-gray-50 rounded-2xl">조리 순서 정보가 없습니다.</div>}
                </div>
             </div>
         </div>
       );
   }
 
-  // ------------------------------------------------
-  // [VIEW 3] 레시피 목록 화면
-  // ------------------------------------------------
+  // [VIEW 3] 목록 화면
   return (
-      <div className="p-4 pb-24 h-full flex flex-col bg-white dark:bg-gray-900 transition-colors">
+      <div className="p-4 pb-24 h-full flex flex-col bg-white">
         <div className="flex justify-between items-center mb-6">
-            <h2 className="text-xl font-bold dark:text-white">오늘 뭐 먹지?</h2>
-            <div className="flex bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
-                <button onClick={() => setActiveTab('default')} className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${activeTab === 'default' ? 'bg-white dark:bg-gray-700 shadow-sm text-green-600' : 'text-gray-400'}`}>추천</button>
-                <button onClick={() => setActiveTab('my')} className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${activeTab === 'my' ? 'bg-white dark:bg-gray-700 shadow-sm text-green-600' : 'text-gray-400'}`}>MY</button>
+            <h2 className="text-xl font-bold">오늘 뭐 먹지?</h2>
+            <div className="flex gap-2">
+                {/* 🟢 [New] 냉장고 털기 필터 버튼 */}
+                <button 
+                    onClick={() => setIsFridgeClearingMode(!isFridgeClearingMode)} 
+                    className={`px-3 py-1.5 text-xs font-bold rounded-lg border transition-all flex items-center gap-1 ${isFridgeClearingMode ? 'bg-red-100 text-red-600 border-red-200' : 'bg-white text-gray-500 border-gray-200'}`}
+                >
+                    <AlertCircle size={14} /> 냉장고 털기 {isFridgeClearingMode ? 'ON' : 'OFF'}
+                </button>
+                <div className="flex bg-gray-100 rounded-lg p-1">
+                    <button onClick={() => setActiveTab('default')} className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${activeTab === 'default' ? 'bg-white shadow-sm text-green-600' : 'text-gray-400'}`}>추천</button>
+                    <button onClick={() => setActiveTab('my')} className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${activeTab === 'my' ? 'bg-white shadow-sm text-green-600' : 'text-gray-400'}`}>MY</button>
+                </div>
             </div>
         </div>
 
@@ -2232,12 +2213,12 @@ function RecipeView({ ingredients, onAddToCart, recipes, user }) {
 
         <div className="mb-6">
             <div className="flex justify-between mb-2">
-                <span className="text-xs font-bold text-gray-500 dark:text-gray-400">냉장고 재료 선택</span>
+                <span className="text-xs font-bold text-gray-500">냉장고 재료 선택</span>
                 <button onClick={toggleSelectAll} className="text-xs text-green-600 font-bold">전체선택</button>
             </div>
             <div className="flex flex-wrap gap-2">
                 {ingredients.map(item => (
-                    <button key={item.id} onClick={() => toggleSelection(item.name)} className={`px-3 py-1.5 rounded-full text-xs border transition-all ${selectedIngredients.includes(item.name) ? 'bg-green-600 text-white border-green-600' : 'bg-white dark:bg-gray-700 text-gray-500 dark:text-gray-300 border-gray-200 dark:border-gray-600'}`}>
+                    <button key={item.id} onClick={() => toggleSelection(item.name)} className={`px-3 py-1.5 rounded-full text-xs border transition-all ${selectedIngredients.includes(item.name) ? 'bg-green-600 text-white border-green-600' : 'bg-white text-gray-500 border-gray-200'}`}>
                         {item.name}
                     </button>
                 ))}
@@ -2246,19 +2227,27 @@ function RecipeView({ ingredients, onAddToCart, recipes, user }) {
 
         <div className="flex-1 overflow-y-auto space-y-3">
             {matchedRecipes.length > 0 ? matchedRecipes.map((recipe, idx) => (
-                <div key={idx} onClick={() => setSelectedRecipe(recipe)} className="bg-white dark:bg-gray-800 p-4 rounded-xl border border-gray-100 dark:border-gray-700 shadow-sm hover:border-green-400 cursor-pointer transition-all">
+                <div key={idx} onClick={() => setSelectedRecipe(recipe)} className={`bg-white p-4 rounded-xl border shadow-sm hover:border-green-400 cursor-pointer transition-all ${recipe.urgencyScore >= 100 ? 'border-red-200 bg-red-50/30' : 'border-gray-100'}`}>
                     <div className="flex justify-between items-start">
-                        <h3 className="font-bold text-gray-800 dark:text-white">{recipe.name}</h3>
+                        <h3 className="font-bold text-gray-800 flex items-center gap-2">
+                            {recipe.name}
+                            {/* 🔥 임박 재료 뱃지 */}
+                            {recipe.urgencyScore >= 100 && <span className="text-[9px] bg-red-500 text-white px-1.5 py-0.5 rounded-full animate-pulse">임박재료!</span>}
+                        </h3>
                         <div className="flex gap-1">
-                           {ingredients.some(i => recipe.ingredients.includes(i.name) && getIngredientUrgency(i.name) > 1) && 
-                              <span className="text-[10px] bg-red-100 text-red-600 px-1.5 py-0.5 rounded font-bold flex items-center gap-0.5"><AlertCircle size={10}/>냉파추천</span>
-                           }
                            {recipe.score > 0 && <span className="text-[10px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded font-bold">{recipe.existing.length}개 일치</span>}
                         </div>
                     </div>
                     <p className="text-xs text-gray-400 mt-1 truncate">{recipe.measure}</p>
                 </div>
-            )) : <div className="text-center py-10 text-gray-400">등록된 레시피가 없습니다.</div>}
+            )) : (
+                <div className="text-center py-20 text-gray-400">
+                    {isFridgeClearingMode ? 
+                        <><AlertCircle className="mx-auto mb-2 text-gray-300"/>임박한 재료로 만들 수 있는<br/>레시피가 없어요 🥲</> : 
+                        "등록된 레시피가 없습니다."
+                    }
+                </div>
+            )}
         </div>
       </div>
   );
