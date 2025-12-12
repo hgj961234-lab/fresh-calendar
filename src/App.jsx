@@ -4,7 +4,9 @@ import {
   Check, X, Search, Clock, ArrowRight, Trash2, RefreshCcw, CheckSquare, Square, 
   BarChart2, TrendingUp, AlertTriangle, ShoppingCart, Edit2, Snowflake, Archive, 
   BookOpen, ArrowLeft, Users, LogOut, Loader, Bell, PieChart, DollarSign, Undo2,
-  Utensils, Filter, SlidersHorizontal, Download // 👈 아이콘 추가됨
+  Utensils, Filter, SlidersHorizontal, Download, 
+  // 👇 여기 3개가 새로 추가된 아이콘입니다.
+  Moon, Sun, MonitorPlay 
 } from 'lucide-react';
 import { Toaster, toast } from 'react-hot-toast'; // 👈 [추가] 토스트 알림
 
@@ -1008,6 +1010,9 @@ function AppContent({ user }) {
   const [trashItems, setTrashItems] = useState([]);
   const [historyItems, setHistoryItems] = useState([]);
   const [selectedDateForAdd, setSelectedDateForAdd] = useState(null);
+  
+  // 🟢 [New] 다크모드 상태 관리
+  const [isDarkMode, setIsDarkMode] = useState(false);
 
   // 1. 데이터 구독 (useEffect)
   useEffect(() => {
@@ -1039,18 +1044,12 @@ function AppContent({ user }) {
     return () => { unsubIng(); unsubCart(); unsubTrash(); unsubHistory(); };
   }, [user]);
 
-  // 2. 헬퍼 함수들 (Notification, addItem 등)
+  // 2. 헬퍼 함수들
   const checkNotifications = (items) => {
     if (!("Notification" in window)) return;
     if (Notification.permission !== "granted") return;
-    // 알림 로직 (필요시 구현)
   };
 
-  const requestNotiPermission = () => {
-    if ("Notification" in window) Notification.requestPermission();
-  };
-
-  // 🟢 Toast 적용된 addItem
   const addItem = async (item) => {
     try { 
       await addDoc(collection(db, `users/${user.uid}/ingredients`), { ...item, addedDate: new Date(), expiry: item.expiry, price: Number(item.price) || 0 }); 
@@ -1097,7 +1096,6 @@ function AppContent({ user }) {
     try {
       const q = query(collection(db, `users/${user.uid}/history`));
       const snapshot = await getDocs(q);
-      if (snapshot.empty) { toast("기록이 없습니다."); return; }
       const batch = writeBatch(db);
       snapshot.docs.forEach((doc) => batch.delete(doc.ref));
       await batch.commit();
@@ -1214,68 +1212,75 @@ function AppContent({ user }) {
     return 'safe';
   };
 
-  // 3. 렌더링 (반응형 레이아웃)
+  // 3. 렌더링 (반응형 + 다크모드 적용)
   return (
-    <div className="min-h-screen bg-gray-100 font-sans flex justify-center text-gray-800">
-      <Toaster position="top-center" toastOptions={{ style: { borderRadius: '20px', background: '#222', color: '#fff', fontSize: '14px' } }} />
+    <div className={`${isDarkMode ? 'dark' : ''}`}> {/* 🟢 다크모드 Wrapper */}
+      <div className="min-h-screen bg-gray-100 dark:bg-gray-900 font-sans flex justify-center text-gray-800 dark:text-gray-100 transition-colors duration-300">
+        <Toaster position="top-center" toastOptions={{ style: { borderRadius: '20px', background: isDarkMode ? '#333' : '#222', color: '#fff', fontSize: '14px' } }} />
 
-      <div className="w-full md:max-w-6xl md:grid md:grid-cols-[400px_1fr] md:gap-8 md:p-8 h-screen md:h-auto">
-        
-        {/* 왼쪽: 모바일 메인 / PC 사이드바 */}
-        <div className="bg-white md:rounded-[30px] shadow-2xl flex flex-col h-full md:h-[85vh] overflow-hidden border-x md:border-0 relative max-w-md mx-auto md:mx-0 w-full">
-          <header className="bg-green-600 text-white p-5 pt-6 shadow-md z-10 flex justify-between items-center">
-            <div><h1 className="text-xl font-bold flex items-center gap-2"><Refrigerator /> Fresh Calendar</h1><p className="text-green-100 text-xs mt-1 opacity-80">{user.email}</p></div>
-            <div className="flex gap-2">
-               <button onClick={resetFridge} className="p-2 bg-green-700 rounded-full hover:bg-red-600 transition-colors" title="초기화"><RefreshCcw size={18} /></button>
-               <button onClick={() => signOut(auth)} className="p-2 bg-green-700 rounded-full hover:bg-green-800 transition-colors"><LogOut size={18} /></button>
-               <button onClick={() => { setSelectedDateForAdd(new Date()); setActiveTab('add'); }} className="bg-white text-green-600 p-2 rounded-full hover:bg-green-50 shadow-sm"><Plus size={18} /></button>
-            </div>
-          </header>
+        <div className="w-full md:max-w-6xl md:grid md:grid-cols-[400px_1fr] md:gap-8 md:p-8 h-screen md:h-auto">
+          
+          {/* 왼쪽: 모바일 메인 / PC 사이드바 */}
+          <div className="bg-white dark:bg-gray-800 md:rounded-[30px] shadow-2xl flex flex-col h-full md:h-[85vh] overflow-hidden border-x md:border-0 relative max-w-md mx-auto md:mx-0 w-full transition-colors">
+            <header className="bg-green-600 text-white p-5 pt-6 shadow-md z-10 flex justify-between items-center">
+              <div><h1 className="text-xl font-bold flex items-center gap-2"><Refrigerator /> Fresh Calendar</h1><p className="text-green-100 text-xs mt-1 opacity-80">{user.email}</p></div>
+              <div className="flex gap-2">
+                {/* 🟢 다크모드 버튼 */}
+                <button onClick={() => setIsDarkMode(!isDarkMode)} className="p-2 bg-green-700 rounded-full hover:bg-green-800 transition-colors">
+                    {isDarkMode ? <Sun size={18} /> : <Moon size={18} />}
+                </button>
+                <button onClick={resetFridge} className="p-2 bg-green-700 rounded-full hover:bg-red-600 transition-colors" title="초기화"><RefreshCcw size={18} /></button>
+                <button onClick={() => signOut(auth)} className="p-2 bg-green-700 rounded-full hover:bg-green-800 transition-colors"><LogOut size={18} /></button>
+                <button onClick={() => { setSelectedDateForAdd(new Date()); setActiveTab('add'); }} className="bg-white text-green-600 p-2 rounded-full hover:bg-green-50 shadow-sm"><Plus size={18} /></button>
+              </div>
+            </header>
 
-          <main className="flex-1 overflow-y-auto bg-gray-50 relative scroll-smooth">
-            {activeTab === 'calendar' && <CalendarView ingredients={ingredients} getRiskLevel={getRiskLevel} onDateSelect={(d) => setSelectedDateForAdd(d)} onAddRequest={(d) => { setSelectedDateForAdd(d); setActiveTab('add'); }} />}
-            {activeTab === 'list' && <FridgeListView ingredients={ingredients} getRiskLevel={getRiskLevel} moveToTrash={moveToTrash} consumeItem={consumeItem} updateIngredient={updateIngredient} onOpenTrash={() => setActiveTab('trash')} />}
-            {activeTab === 'trash' && <TrashView trashItems={trashItems} onRestore={restoreFromTrash} onPermanentDelete={permanentDelete} onClose={() => setActiveTab('list')} />}
-            {activeTab === 'recipes' && <RecipeView ingredients={ingredients} onAddToCart={addToCart} recipes={RECIPE_FULL_DB} user={user} />} 
-            {activeTab === 'cart' && ( 
-                <ShoppingCartView 
+            <main className="flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-900 relative scroll-smooth transition-colors">
+              {activeTab === 'calendar' && <CalendarView ingredients={ingredients} getRiskLevel={getRiskLevel} onDateSelect={(d) => setSelectedDateForAdd(d)} onAddRequest={(d) => { setSelectedDateForAdd(d); setActiveTab('add'); }} />}
+              {activeTab === 'list' && <FridgeListView ingredients={ingredients} getRiskLevel={getRiskLevel} moveToTrash={moveToTrash} consumeItem={consumeItem} updateIngredient={updateIngredient} onOpenTrash={() => setActiveTab('trash')} />}
+              {activeTab === 'trash' && <TrashView trashItems={trashItems} onRestore={restoreFromTrash} onPermanentDelete={permanentDelete} onClose={() => setActiveTab('list')} />}
+              {activeTab === 'recipes' && <RecipeView ingredients={ingredients} onAddToCart={addToCart} recipes={RECIPE_FULL_DB} user={user} />} 
+              {activeTab === 'cart' && ( 
+                  <ShoppingCartView 
                     cart={cart} 
+                    ingredients={ingredients} // 🟢 [중요] 중복 체크를 위해 재료 목록 전달
                     onUpdateCount={updateCartCount} 
                     onRemove={removeItemsFromCart} 
                     onCheckout={checkoutCartItems} 
                     onUpdateDetail={updateCartItemDetail} 
-                    onAdd={addToCart} // 👈 여기가 추가되었습니다!
-                /> 
-            )}
-            {activeTab === 'stats' && <InsightsView ingredients={ingredients} onAddToCart={addToCart} history={historyItems} onResetHistory={resetHistory} />}
-            {activeTab === 'add' && <AddItemModal onClose={() => setActiveTab('calendar')} onAdd={addItem} initialDate={selectedDateForAdd} />}
-          </main>
+                    onAdd={addToCart}
+                  /> 
+              )}
+              {activeTab === 'stats' && <InsightsView ingredients={ingredients} onAddToCart={addToCart} history={historyItems} onResetHistory={resetHistory} />}
+              {activeTab === 'add' && <AddItemModal onClose={() => setActiveTab('calendar')} onAdd={addItem} initialDate={selectedDateForAdd} />}
+            </main>
 
-          <nav className="bg-white border-t flex justify-between px-6 py-3 pb-6 shadow-[0_-5px_15px_rgba(0,0,0,0.05)] md:hidden">
-            <NavBtn active={activeTab==='calendar'} onClick={()=>setActiveTab('calendar')} icon={<Calendar />} label="달력" />
-            <NavBtn active={activeTab==='list'} onClick={()=>setActiveTab('list')} icon={<Refrigerator />} label="냉장고" />
-            <NavBtn active={activeTab==='cart'} onClick={()=>setActiveTab('cart')} icon={<ShoppingCart />} label="카트" count={cart.reduce((sum, item) => sum + item.count, 0)} />
-            <NavBtn active={activeTab==='recipes'} onClick={()=>setActiveTab('recipes')} icon={<ChefHat />} label="레시피" />
-            <NavBtn active={activeTab==='stats'} onClick={()=>setActiveTab('stats')} icon={<BarChart2 />} label="통계" />
-          </nav>
-        </div>
+            <nav className="bg-white dark:bg-gray-800 border-t dark:border-gray-700 flex justify-between px-6 py-3 pb-6 shadow-[0_-5px_15px_rgba(0,0,0,0.05)] md:hidden transition-colors">
+              <NavBtn active={activeTab==='calendar'} onClick={()=>setActiveTab('calendar')} icon={<Calendar />} label="달력" />
+              <NavBtn active={activeTab==='list'} onClick={()=>setActiveTab('list')} icon={<Refrigerator />} label="냉장고" />
+              <NavBtn active={activeTab==='cart'} onClick={()=>setActiveTab('cart')} icon={<ShoppingCart />} label="카트" count={cart.reduce((sum, item) => sum + item.count, 0)} />
+              <NavBtn active={activeTab==='recipes'} onClick={()=>setActiveTab('recipes')} icon={<ChefHat />} label="레시피" />
+              <NavBtn active={activeTab==='stats'} onClick={()=>setActiveTab('stats')} icon={<BarChart2 />} label="통계" />
+            </nav>
+          </div>
 
-        {/* 오른쪽: PC 전용 대시보드 */}
-        <div className="hidden md:flex flex-col gap-6 h-[85vh]">
-           <div className="bg-white rounded-[30px] shadow-xl p-8 flex-1 overflow-y-auto">
-              <h2 className="text-2xl font-bold mb-6 text-gray-800 flex items-center gap-2"><TrendingUp className="text-green-600" /> 나의 키친 대시보드</h2>
+          {/* 오른쪽: PC 전용 대시보드 */}
+          <div className="hidden md:flex flex-col gap-6 h-[85vh]">
+            <div className="bg-white dark:bg-gray-800 rounded-[30px] shadow-xl p-8 flex-1 overflow-y-auto transition-colors">
+              <h2 className="text-2xl font-bold mb-6 text-gray-800 dark:text-gray-100 flex items-center gap-2"><TrendingUp className="text-green-600" /> 나의 키친 대시보드</h2>
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-full">
-                 <div className="bg-gray-50 rounded-3xl p-2"><InsightsView ingredients={ingredients} onAddToCart={addToCart} history={historyItems} onResetHistory={resetHistory} /></div>
-                 <div className="bg-green-50 rounded-3xl p-6 overflow-y-auto border border-green-100">
-                    <h3 className="font-bold text-green-800 mb-4 flex items-center gap-2"><ChefHat size={20}/> 추천 메뉴</h3>
-                    <div className="text-sm text-green-700 bg-white/50 p-4 rounded-xl">
-                       왼쪽 메뉴에서 '레시피' 탭을 선택하여<br/>전체 기능을 확인해보세요!
+                 <div className="bg-gray-50 dark:bg-gray-700 rounded-3xl p-2"><InsightsView ingredients={ingredients} onAddToCart={addToCart} history={historyItems} onResetHistory={resetHistory} /></div>
+                 <div className="bg-green-50 dark:bg-green-900/20 rounded-3xl p-6 overflow-y-auto border border-green-100 dark:border-green-800">
+                    <h3 className="font-bold text-green-800 dark:text-green-400 mb-4 flex items-center gap-2"><ChefHat size={20}/> 추천 메뉴</h3>
+                    <div className="text-sm text-green-700 dark:text-green-300 bg-white/50 dark:bg-black/20 p-4 rounded-xl">
+                       왼쪽 메뉴에서 '레시피' 탭을 선택하여<br/>유통기한 임박 재료 레시피를 확인해보세요!
                     </div>
                  </div>
               </div>
-           </div>
-        </div>
+            </div>
+          </div>
 
+        </div>
       </div>
     </div>
   );
@@ -1665,9 +1670,12 @@ function AddItemModal({ onClose, onAdd, initialDate }) {
 }
 
 // --- 장바구니 뷰 (수정됨: 직접 추가 기능 포함) ---
-function ShoppingCartView({ cart, onUpdateCount, onRemove, onCheckout, onUpdateDetail, onAdd }) {
+function ShoppingCartView({ cart, ingredients, onUpdateCount, onRemove, onCheckout, onUpdateDetail, onAdd }) {
   const [selectedNames, setSelectedNames] = useState([]);
-  const [newItemName, setNewItemName] = useState(''); // 👈 직접 입력용 상태
+  const [newItemName, setNewItemName] = useState('');
+  
+  // 🟢 [New] 냉장고 털기(중복 체크) 모달 상태
+  const [pantryCheckModal, setPantryCheckModal] = useState({ isOpen: false, duplicates: [] });
 
   const toggleSelection = (name) => { if (selectedNames.includes(name)) setSelectedNames(selectedNames.filter(n => n !== name)); else setSelectedNames([...selectedNames, name]); };
   const toggleSelectAll = () => { if (selectedNames.length === cart.length && cart.length > 0) setSelectedNames([]); else setSelectedNames(cart.map(i => i.name)); };
@@ -1698,7 +1706,6 @@ function ShoppingCartView({ cart, onUpdateCount, onRemove, onCheckout, onUpdateD
     return Math.round(estimated / 10) * 10;
   };
 
-  // 🟢 [추가] 직접 추가 핸들러
   const handleManualAdd = (e) => {
     e.preventDefault();
     if (!newItemName.trim()) return;
@@ -1721,18 +1728,36 @@ function ShoppingCartView({ cart, onUpdateCount, onRemove, onCheckout, onUpdateD
       onUpdateDetail(item.id, updates);
   };
 
+  // 🟢 [New] 냉장고로 이동 요청 (중복 검사 로직)
+  const handleCheckoutRequest = () => {
+    // 냉장고에 있는 재료와 이름이 겹치는지 확인
+    const duplicates = selectedNames.filter(cartItemName => 
+      ingredients.some(ing => ing.name.replace(/\s/g, '') === cartItemName.replace(/\s/g, ''))
+    );
+
+    if (duplicates.length > 0) {
+      setPantryCheckModal({ isOpen: true, duplicates }); // 중복 있으면 모달 띄움
+    } else {
+      onCheckout(selectedNames); // 중복 없으면 바로 이동
+    }
+  };
+
+  const confirmPantryCheck = (finalSelection) => {
+    onCheckout(finalSelection);
+    setPantryCheckModal({ isOpen: false, duplicates: [] });
+  };
+
   return (
     <div className="p-4 pb-20">
-      <h2 className="text-lg font-bold mb-4 flex items-center gap-2"><ShoppingCart className="text-green-600" /> 장바구니</h2>
+      <h2 className="text-lg font-bold mb-4 flex items-center gap-2 dark:text-gray-100"><ShoppingCart className="text-green-600" /> 장바구니</h2>
       
-      {/* 🟢 [추가] 상단 직접 입력 폼 */}
       <form onSubmit={handleManualAdd} className="flex gap-2 mb-6">
         <input 
           type="text" 
           value={newItemName}
           onChange={(e) => setNewItemName(e.target.value)}
           placeholder="필요한 재료 직접 입력..." 
-          className="flex-1 p-3 bg-white border border-gray-200 rounded-xl outline-none focus:border-green-500 shadow-sm"
+          className="flex-1 p-3 bg-white dark:bg-gray-700 dark:text-white border border-gray-200 dark:border-gray-600 rounded-xl outline-none focus:border-green-500 shadow-sm placeholder:text-gray-400"
         />
         <button type="submit" className="bg-gray-800 text-white p-3 rounded-xl font-bold hover:bg-black transition-colors">
           <Plus size={20} />
@@ -1741,41 +1766,77 @@ function ShoppingCartView({ cart, onUpdateCount, onRemove, onCheckout, onUpdateD
 
       {cart.length === 0 ? <div className="text-center py-10 text-gray-400">장바구니가 비었습니다.</div> : (
         <div className="space-y-3">
-          <div className="flex items-center justify-between mb-2"><button onClick={toggleSelectAll} className="flex items-center gap-2 text-sm text-gray-600"><CheckSquare size={18} /> 전체 선택</button>{selectedNames.length > 0 && <button onClick={()=>onRemove(selectedNames)} className="text-xs text-red-500">선택 삭제</button>}</div>
+          <div className="flex items-center justify-between mb-2"><button onClick={toggleSelectAll} className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300"><CheckSquare size={18} /> 전체 선택</button>{selectedNames.length > 0 && <button onClick={()=>onRemove(selectedNames)} className="text-xs text-red-500">선택 삭제</button>}</div>
           {cart.map(item => {
             const currentUnit = item.unit || getDefaultUnit(item.name);
             return (
-            <div key={item.id} className="bg-white p-4 rounded-xl border shadow-sm space-y-3">
+            <div key={item.id} className="bg-white dark:bg-gray-800 p-4 rounded-xl border dark:border-gray-700 shadow-sm space-y-3">
                 <div className="flex justify-between items-center">
                     <div className="flex items-center gap-3">
                         <button onClick={()=>toggleSelection(item.name)}>{selectedNames.includes(item.name) ? <CheckSquare className="text-green-600"/> : <Square className="text-gray-300"/>}</button>
-                        <span className="font-bold text-lg">{item.name}</span>
+                        <span className="font-bold text-lg dark:text-gray-100">{item.name}</span>
                     </div>
-                    <div className="flex items-center bg-gray-100 rounded-lg">
-                        <button onClick={() => onUpdateCount(item.name, -1)} className="p-1 px-2">-</button>
-                        <span className="px-2 text-sm font-bold">{item.count}</span>
-                        <button onClick={() => onUpdateCount(item.name, 1)} className="p-1 px-2">+</button>
+                    <div className="flex items-center bg-gray-100 dark:bg-gray-700 rounded-lg">
+                        <button onClick={() => onUpdateCount(item.name, -1)} className="p-1 px-2 dark:text-white">-</button>
+                        <span className="px-2 text-sm font-bold dark:text-white">{item.count}</span>
+                        <button onClick={() => onUpdateCount(item.name, 1)} className="p-1 px-2 dark:text-white">+</button>
                     </div>
                 </div>
 
-                <div className="flex gap-2 bg-gray-50 p-2 rounded-lg">
+                <div className="flex gap-2 bg-gray-50 dark:bg-gray-700 p-2 rounded-lg">
                     <div className="flex-1">
-                        <label className="text-[10px] text-gray-500 block">용량/수량</label>
+                        <label className="text-[10px] text-gray-500 dark:text-gray-400 block">용량/수량</label>
                         <div className="flex gap-1">
-                            <input type="number" placeholder="0" value={item.amount || ''} onChange={(e) => handleAmountChange(item, e.target.value)} className="w-full bg-white border rounded px-1 py-1 text-sm outline-none focus:border-green-500" />
-                            <select value={currentUnit} onChange={(e) => handleUnitChange(item, e.target.value)} className="bg-white border rounded text-xs">
+                            <input type="number" placeholder="0" value={item.amount || ''} onChange={(e) => handleAmountChange(item, e.target.value)} className="w-full bg-white dark:bg-gray-600 dark:text-white border dark:border-gray-500 rounded px-1 py-1 text-sm outline-none focus:border-green-500" />
+                            <select value={currentUnit} onChange={(e) => handleUnitChange(item, e.target.value)} className="bg-white dark:bg-gray-600 dark:text-white border dark:border-gray-500 rounded text-xs">
                                 <option value="g">g</option><option value="kg">kg</option><option value="ml">ml</option><option value="L">L</option><option value="개">개</option><option value="봉">봉</option>
                             </select>
                         </div>
                     </div>
                     <div className="flex-1">
-                        <label className="text-[10px] text-gray-500 block">예상 가격(원)</label>
-                        <input type="number" placeholder="0" value={item.price || ''} onChange={(e) => onUpdateDetail(item.id, { price: e.target.value })} className="w-full bg-white border rounded px-1 py-1 text-sm outline-none focus:border-green-500" />
+                        <label className="text-[10px] text-gray-500 dark:text-gray-400 block">예상 가격(원)</label>
+                        <input type="number" placeholder="0" value={item.price || ''} onChange={(e) => onUpdateDetail(item.id, { price: e.target.value })} className="w-full bg-white dark:bg-gray-600 dark:text-white border dark:border-gray-500 rounded px-1 py-1 text-sm outline-none focus:border-green-500" />
                     </div>
                 </div>
             </div>
           )})}
-          <button onClick={()=>onCheckout(selectedNames)} disabled={selectedNames.length===0} className="w-full bg-green-600 text-white py-3 rounded-xl font-bold mt-4 disabled:bg-gray-300">냉장고로 이동</button>
+          
+          {/* 🟢 [Changed] 냉장고로 이동 버튼 (핸들러 변경됨) */}
+          <button onClick={handleCheckoutRequest} disabled={selectedNames.length===0} className="w-full bg-green-600 text-white py-3 rounded-xl font-bold mt-4 disabled:bg-gray-300">냉장고로 이동</button>
+        </div>
+      )}
+
+      {/* 🟢 [New] Pantry Check 모달 */}
+      {pantryCheckModal.isOpen && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 animate-in fade-in">
+           <div className="bg-white dark:bg-gray-800 w-full max-w-sm rounded-2xl p-6 shadow-2xl">
+              <h3 className="text-lg font-bold mb-2 dark:text-white">잠깐! 냉장고에 이미 있어요 🧐</h3>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+                 아래 재료들은 이미 냉장고에 있는 것 같습니다.<br/>제외하고 넣을까요?
+              </p>
+              <div className="bg-gray-50 dark:bg-gray-700 rounded-xl p-3 mb-4 max-h-40 overflow-y-auto">
+                 {pantryCheckModal.duplicates.map(name => (
+                    <div key={name} className="flex justify-between items-center py-2 border-b dark:border-gray-600 last:border-0">
+                       <span className="font-bold text-gray-700 dark:text-gray-200">{name}</span>
+                       <span className="text-xs text-red-500 font-bold">중복 감지</span>
+                    </div>
+                 ))}
+              </div>
+              <div className="flex gap-2">
+                 <button 
+                    onClick={() => confirmPantryCheck(selectedNames.filter(n => !pantryCheckModal.duplicates.includes(n)))} 
+                    className="flex-1 bg-green-600 text-white py-3 rounded-xl font-bold text-sm hover:bg-green-700"
+                 >
+                    네, 빼고 넣을게요
+                 </button>
+                 <button 
+                    onClick={() => confirmPantryCheck(selectedNames)} 
+                    className="flex-1 bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-200 py-3 rounded-xl font-bold text-sm hover:bg-gray-300"
+                 >
+                    그냥 다 넣기
+                 </button>
+              </div>
+           </div>
         </div>
       )}
     </div>
@@ -1788,8 +1849,12 @@ function RecipeView({ ingredients, onAddToCart, recipes, user }) {
   const [myRecipes, setMyRecipes] = useState([]);
   const [selectedIngredients, setSelectedIngredients] = useState([]);
   const [selectedRecipe, setSelectedRecipe] = useState(null);
+  
+  // 🟢 [New] 인분 조절 및 조리 모드 상태
+  const [servings, setServings] = useState(1); 
+  const [isCookingMode, setIsCookingMode] = useState(false);
+  const [currentStep, setCurrentStep] = useState(0);
 
-  // 내 레시피 불러오기
   useEffect(() => {
     if(!user) return;
     const q = query(collection(db, `users/${user.uid}/recipes`));
@@ -1810,105 +1875,181 @@ function RecipeView({ ingredients, onAddToCart, recipes, user }) {
             name, category: 'My',
             ingredients: ingreds ? ingreds.split(',').map(s=>s.trim()) : [],
             measure: ingreds || '',
-            steps: steps ? [steps] : ['자유롭게 조리하세요!'] // 간단히 배열로 저장
+            steps: steps ? [steps] : ['자유롭게 조리하세요!']
         });
         toast.success('나만의 레시피가 추가되었습니다!');
     } catch(e) { toast.error('저장 실패'); }
   };
 
-  const allRecipes = activeTab === 'default' ? recipes : myRecipes;
-  const toggleSelection = (name) => { if (selectedIngredients.includes(name)) setSelectedIngredients(selectedIngredients.filter(i => i !== name)); else setSelectedIngredients([...selectedIngredients, name]); };
-  const toggleSelectAll = () => { if (selectedIngredients.length === ingredients.length && ingredients.length > 0) setSelectedIngredients([]); else setSelectedIngredients(ingredients.map(i => i.name)); };
+  const getIngredientUrgency = (ingName) => {
+    const matchedItems = ingredients.filter(i => matchIngredient(ingName, i.name));
+    if (matchedItems.length === 0) return 0;
+    const hasDanger = matchedItems.some(i => {
+       const today = new Date(); today.setHours(0,0,0,0);
+       const exp = new Date(i.expiry); exp.setHours(0,0,0,0);
+       const diff = (exp - today) / (1000 * 60 * 60 * 24);
+       return diff <= 3;
+    });
+    return hasDanger ? 5 : 1; 
+  };
+
   const matchIngredient = (r, u) => { const rr=r.replace(/\s/g,''), uu=u.replace(/\s/g,''); if(rr===uu)return true; return rr.includes(uu)||uu.includes(rr); };
   
+  const allRecipes = activeTab === 'default' ? recipes : myRecipes;
+  
+  // 🟢 [Updated] 유통기한 임박 재료 가중치 정렬
   const matchedRecipes = allRecipes.map(recipe => {
       const existing = recipe.ingredients.filter(req => selectedIngredients.some(sel => matchIngredient(req, sel)));
       const missing = recipe.ingredients.filter(req => !selectedIngredients.some(sel => matchIngredient(req, sel)));
-      return { ...recipe, existing, missing, score: existing.length };
+      
+      let urgencyScore = 0;
+      recipe.ingredients.forEach(ing => { if(selectedIngredients.includes(ing)) urgencyScore += getIngredientUrgency(ing); });
+      
+      return { ...recipe, existing, missing, score: existing.length + urgencyScore };
   }).sort((a, b) => b.score - a.score);
 
-  // 🟢 [추가] 일괄 추가 함수
+  const toggleSelection = (name) => { if (selectedIngredients.includes(name)) setSelectedIngredients(selectedIngredients.filter(i => i !== name)); else setSelectedIngredients([...selectedIngredients, name]); };
+  const toggleSelectAll = () => { if (selectedIngredients.length === ingredients.length && ingredients.length > 0) setSelectedIngredients([]); else setSelectedIngredients(ingredients.map(i => i.name)); };
+  
   const handleAddAllIngredients = (recipeItems) => {
       if(!recipeItems || recipeItems.length === 0) return;
       recipeItems.forEach(item => onAddToCart(item));
       toast.success('모든 재료를 장바구니에 담았습니다!');
   };
 
-  // 🟢 [수정] 상세 보기 화면 (조리 순서 + 일괄 담기)
+  // 🟢 [New] 텍스트 내 숫자 자동 계산 (인분 조절)
+  const scaleText = (text, factor) => {
+     if (factor === 1 || !text) return text;
+     return text.replace(/(\d+(\.\d+)?)/g, (match) => {
+        const num = parseFloat(match);
+        return Number.isInteger(num * factor) ? (num * factor) : (num * factor).toFixed(1);
+     });
+  };
+
+  // 🟢 [New] 화면 꺼짐 방지 & 조리 모드
+  const toggleCookingMode = async () => {
+     if (!isCookingMode) {
+        try {
+           if ('wakeLock' in navigator) {
+              await navigator.wakeLock.request('screen');
+              toast.success("화면 켜짐 유지 모드 ON 💡");
+           }
+        } catch(e) { console.log('Wake Lock Error', e); }
+        setIsCookingMode(true);
+        setCurrentStep(0);
+     } else {
+        setIsCookingMode(false);
+     }
+  };
+
+  // 1. 조리 모드 뷰 (전체 화면)
+  if (isCookingMode && selectedRecipe) {
+     const scaledSteps = selectedRecipe.steps.map(s => scaleText(s, servings));
+     return (
+        <div className="fixed inset-0 z-50 bg-gray-900 text-white flex flex-col animate-in fade-in duration-300">
+           <div className="flex justify-between items-center p-6 border-b border-gray-700">
+              <h2 className="text-xl font-bold truncate pr-4">{selectedRecipe.name} (Step {currentStep + 1}/{scaledSteps.length})</h2>
+              <button onClick={toggleCookingMode} className="bg-red-600 px-4 py-2 rounded-lg font-bold text-sm flex items-center gap-1 hover:bg-red-700"><X size={16}/> 종료</button>
+           </div>
+           
+           <div className="flex-1 flex items-center justify-center p-8 text-center">
+              <div className="max-w-2xl">
+                 <span className="inline-block bg-green-600 text-2xl font-bold rounded-full w-16 h-16 flex items-center justify-center mb-6 mx-auto shadow-lg shadow-green-900/50">{currentStep + 1}</span>
+                 <p className="text-2xl md:text-4xl font-bold leading-relaxed whitespace-pre-wrap">{scaledSteps[currentStep]}</p>
+              </div>
+           </div>
+
+           <div className="p-8 pb-10 flex justify-between items-center bg-gray-800">
+              <button disabled={currentStep===0} onClick={()=>setCurrentStep(prev=>prev-1)} className="flex items-center gap-2 text-lg font-bold disabled:opacity-30 hover:text-green-400"><ChevronLeft size={30}/> 이전</button>
+              <button disabled={currentStep===scaledSteps.length-1} onClick={()=>setCurrentStep(prev=>prev+1)} className="flex items-center gap-2 text-lg font-bold disabled:opacity-30 hover:text-green-400">다음 <ChevronRight size={30}/></button>
+           </div>
+        </div>
+     );
+  }
+
+  // 2. 레시피 상세 화면
   if (selectedRecipe) {
       return (
-        <div className="p-4 pb-24 h-full bg-white flex flex-col overflow-y-auto">
-            {/* 상단 네비게이션 */}
-           <div className="sticky top-0 bg-white z-10 pb-4 border-b mb-4">
-               <button onClick={() => setSelectedRecipe(null)} className="text-gray-500 flex items-center gap-2 mb-2 hover:text-green-600 font-bold">
+        <div className="p-4 pb-24 h-full bg-white dark:bg-gray-900 flex flex-col overflow-y-auto transition-colors">
+            <div className="sticky top-0 bg-white dark:bg-gray-900 z-10 pb-4 border-b dark:border-gray-700 mb-4">
+               <button onClick={() => { setSelectedRecipe(null); setServings(1); }} className="text-gray-500 dark:text-gray-400 flex items-center gap-2 mb-2 hover:text-green-600 font-bold">
                    <ArrowLeft size={20}/> 목록으로 돌아가기
                </button>
-               <h2 className="text-3xl font-bold text-gray-800">{selectedRecipe.name}</h2>
+               <div className="flex justify-between items-end">
+                  <h2 className="text-3xl font-bold text-gray-800 dark:text-white">{selectedRecipe.name}</h2>
+                  <button onClick={toggleCookingMode} className="bg-green-600 text-white px-4 py-2 rounded-xl font-bold text-sm shadow-md hover:bg-green-700 flex items-center gap-2 animate-pulse">
+                     <MonitorPlay size={18}/> 요리 시작
+                  </button>
+               </div>
                <div className="flex gap-2 mt-2">
                    <span className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full font-bold">{selectedRecipe.category}</span>
-                   <span className="bg-gray-100 text-gray-600 text-xs px-2 py-1 rounded-full">재료 {selectedRecipe.ingredients.length}개</span>
+                   <span className="bg-gray-100 dark:bg-gray-700 dark:text-gray-300 text-gray-600 text-xs px-2 py-1 rounded-full">재료 {selectedRecipe.ingredients.length}개</span>
                </div>
-           </div>
+            </div>
+            
+            {/* 🟢 [New] 인분 조절기 */}
+            <div className="bg-green-50 dark:bg-gray-800 p-4 rounded-2xl mb-6 border border-green-100 dark:border-gray-700 flex items-center justify-between">
+               <span className="font-bold text-green-800 dark:text-green-400 flex items-center gap-2"><Users size={18}/> 기준 인원</span>
+               <div className="flex items-center bg-white dark:bg-gray-700 rounded-lg shadow-sm">
+                  <button onClick={() => setServings(Math.max(1, servings - 1))} className="p-2 px-3 hover:bg-gray-100 dark:hover:bg-gray-600 rounded-l-lg dark:text-white">-</button>
+                  <span className="px-4 font-bold text-lg w-16 text-center dark:text-white">{servings}인분</span>
+                  <button onClick={() => setServings(servings + 1)} className="p-2 px-3 hover:bg-gray-100 dark:hover:bg-gray-600 rounded-r-lg dark:text-white">+</button>
+               </div>
+            </div>
 
-           {/* 재료 섹션 */}
-           <div className="mb-8">
-               <div className="flex justify-between items-center mb-3">
-                   <h3 className="text-lg font-bold flex items-center gap-2"><ShoppingCart size={18}/> 필요 재료</h3>
-                   <button 
-                       onClick={() => handleAddAllIngredients(selectedRecipe.ingredients)}
-                       className="text-xs bg-green-600 text-white px-3 py-1.5 rounded-lg font-bold shadow-md hover:bg-green-700 transition-colors flex items-center gap-1"
-                   >
-                       <Plus size={12}/> 전체 장바구니 담기
-                   </button>
-               </div>
-               <div className="bg-gray-50 p-4 rounded-2xl text-sm text-gray-700 leading-relaxed mb-4">
-                   {selectedRecipe.measure}
-               </div>
-               <div className="flex flex-wrap gap-2">
-                   {selectedRecipe.ingredients.map((ing, i) => {
-                       const have = selectedIngredients.some(sel => matchIngredient(ing, sel));
-                       return (
-                           <span key={i} className={`px-3 py-1 rounded-full text-xs border ${have ? 'bg-green-100 text-green-700 border-green-200 line-through opacity-60' : 'bg-white text-gray-600 border-gray-200'}`}>
-                               {ing}
-                           </span>
-                       );
-                   })}
-               </div>
-           </div>
+            <div className="mb-8">
+                <div className="flex justify-between items-center mb-3">
+                    <h3 className="text-lg font-bold flex items-center gap-2 dark:text-white"><ShoppingCart size={18}/> 필요 재료</h3>
+                    <button onClick={() => handleAddAllIngredients(selectedRecipe.ingredients)} className="text-xs bg-green-600 text-white px-3 py-1.5 rounded-lg font-bold shadow-md hover:bg-green-700 transition-colors flex items-center gap-1">
+                        <Plus size={12}/> 전체 장바구니 담기
+                    </button>
+                </div>
+                <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-2xl text-sm text-gray-700 dark:text-gray-300 leading-relaxed mb-4 whitespace-pre-line">
+                    {/* 인분 수에 따라 텍스트 자동 변환 */}
+                    {scaleText(selectedRecipe.measure, servings)}
+                </div>
+                <div className="flex flex-wrap gap-2">
+                    {selectedRecipe.ingredients.map((ing, i) => {
+                        const have = selectedIngredients.some(sel => matchIngredient(ing, sel));
+                        return (
+                            <span key={i} className={`px-3 py-1 rounded-full text-xs border ${have ? 'bg-green-100 text-green-700 border-green-200 line-through opacity-60' : 'bg-white text-gray-600 border-gray-200'}`}>
+                                {ing}
+                            </span>
+                        );
+                    })}
+                </div>
+            </div>
 
-           {/* 조리 순서 섹션 (여기 추가됨) */}
-           <div className="mb-8">
-               <h3 className="text-lg font-bold flex items-center gap-2 mb-4"><ChefHat size={18}/> 조리 순서</h3>
+            <div className="mb-8">
+               <h3 className="text-lg font-bold flex items-center gap-2 mb-4 dark:text-white"><ChefHat size={18}/> 조리 순서</h3>
                <div className="space-y-4">
                    {selectedRecipe.steps && selectedRecipe.steps.length > 0 ? (
                        selectedRecipe.steps.map((step, index) => (
                            <div key={index} className="flex gap-4">
-                               <div className="flex-shrink-0 w-8 h-8 bg-green-600 text-white rounded-full flex items-center justify-center font-bold text-sm shadow-md">
-                                   {index + 1}
-                               </div>
-                               <div className="flex-1 bg-white border border-gray-100 p-4 rounded-2xl shadow-sm text-gray-700 leading-relaxed hover:border-green-200 transition-colors">
-                                   {step}
+                               <div className="flex-shrink-0 w-8 h-8 bg-green-600 text-white rounded-full flex items-center justify-center font-bold text-sm shadow-md">{index + 1}</div>
+                               <div className="flex-1 bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-4 rounded-2xl shadow-sm text-gray-700 dark:text-gray-300 leading-relaxed">
+                                   {/* 인분 수에 따라 텍스트 자동 변환 */}
+                                   {scaleText(step, servings)}
                                </div>
                            </div>
                        ))
                    ) : (
-                       <div className="text-center text-gray-400 py-10 bg-gray-50 rounded-2xl">
-                           조리 순서 정보가 없습니다.
-                       </div>
+                       <div className="text-center text-gray-400 py-10 bg-gray-50 dark:bg-gray-800 rounded-2xl">조리 순서 정보가 없습니다.</div>
                    )}
                </div>
-           </div>
+            </div>
         </div>
       );
   }
 
+  // 3. 레시피 목록 화면
   return (
-      <div className="p-4 pb-24 h-full flex flex-col bg-white">
+      <div className="p-4 pb-24 h-full flex flex-col bg-white dark:bg-gray-900 transition-colors">
         <div className="flex justify-between items-center mb-6">
-            <h2 className="text-xl font-bold">오늘 뭐 먹지?</h2>
-            <div className="flex bg-gray-100 rounded-lg p-1">
-                <button onClick={() => setActiveTab('default')} className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${activeTab === 'default' ? 'bg-white shadow-sm text-green-600' : 'text-gray-400'}`}>추천</button>
-                <button onClick={() => setActiveTab('my')} className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${activeTab === 'my' ? 'bg-white shadow-sm text-green-600' : 'text-gray-400'}`}>MY</button>
+            <h2 className="text-xl font-bold dark:text-white">오늘 뭐 먹지?</h2>
+            <div className="flex bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
+                <button onClick={() => setActiveTab('default')} className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${activeTab === 'default' ? 'bg-white dark:bg-gray-700 shadow-sm text-green-600' : 'text-gray-400'}`}>추천</button>
+                <button onClick={() => setActiveTab('my')} className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${activeTab === 'my' ? 'bg-white dark:bg-gray-700 shadow-sm text-green-600' : 'text-gray-400'}`}>MY</button>
             </div>
         </div>
 
@@ -1918,28 +2059,32 @@ function RecipeView({ ingredients, onAddToCart, recipes, user }) {
             </button>
         )}
 
-        {/* 재료 선택 영역 */}
         <div className="mb-6">
             <div className="flex justify-between mb-2">
-                <span className="text-xs font-bold text-gray-500">냉장고 재료 선택</span>
+                <span className="text-xs font-bold text-gray-500 dark:text-gray-400">냉장고 재료 선택</span>
                 <button onClick={toggleSelectAll} className="text-xs text-green-600 font-bold">전체선택</button>
             </div>
             <div className="flex flex-wrap gap-2">
                 {ingredients.map(item => (
-                    <button key={item.id} onClick={() => toggleSelection(item.name)} className={`px-3 py-1.5 rounded-full text-xs border transition-all ${selectedIngredients.includes(item.name) ? 'bg-green-600 text-white border-green-600' : 'bg-white text-gray-500 border-gray-200'}`}>
+                    <button key={item.id} onClick={() => toggleSelection(item.name)} className={`px-3 py-1.5 rounded-full text-xs border transition-all ${selectedIngredients.includes(item.name) ? 'bg-green-600 text-white border-green-600' : 'bg-white dark:bg-gray-700 text-gray-500 dark:text-gray-300 border-gray-200 dark:border-gray-600'}`}>
                         {item.name}
                     </button>
                 ))}
             </div>
         </div>
 
-        {/* 레시피 리스트 */}
         <div className="flex-1 overflow-y-auto space-y-3">
             {matchedRecipes.length > 0 ? matchedRecipes.map((recipe, idx) => (
-                <div key={idx} onClick={() => setSelectedRecipe(recipe)} className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm hover:border-green-400 cursor-pointer transition-all">
+                <div key={idx} onClick={() => setSelectedRecipe(recipe)} className="bg-white dark:bg-gray-800 p-4 rounded-xl border border-gray-100 dark:border-gray-700 shadow-sm hover:border-green-400 cursor-pointer transition-all">
                     <div className="flex justify-between items-start">
-                        <h3 className="font-bold text-gray-800">{recipe.name}</h3>
-                        {recipe.score > 0 && <span className="text-[10px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded font-bold">{recipe.score}개 일치</span>}
+                        <h3 className="font-bold text-gray-800 dark:text-white">{recipe.name}</h3>
+                        <div className="flex gap-1">
+                           {/* 유통기한 임박 추천 뱃지 */}
+                           {ingredients.some(i => recipe.ingredients.includes(i.name) && getIngredientUrgency(i.name) > 1) && 
+                              <span className="text-[10px] bg-red-100 text-red-600 px-1.5 py-0.5 rounded font-bold flex items-center gap-0.5"><AlertCircle size={10}/>냉파추천</span>
+                           }
+                           {recipe.score > 0 && <span className="text-[10px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded font-bold">{recipe.existing.length}개 일치</span>}
+                        </div>
                     </div>
                     <p className="text-xs text-gray-400 mt-1 truncate">{recipe.measure}</p>
                 </div>
