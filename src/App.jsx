@@ -1002,7 +1002,7 @@ function AuthScreen() {
   );
 }
 
-// --- 실제 앱 콘텐츠 (반응형 + Toast + 모든 기능 통합) ---
+// --- AppContent: 다크모드 수정 & 장바구니 로직 개선 ---
 function AppContent({ user }) {
   const [activeTab, setActiveTab] = useState('calendar');
   const [ingredients, setIngredients] = useState([]);
@@ -1011,7 +1011,7 @@ function AppContent({ user }) {
   const [historyItems, setHistoryItems] = useState([]);
   const [selectedDateForAdd, setSelectedDateForAdd] = useState(null);
   
-  // 🟢 [New] 다크모드 상태 관리
+  // 🟢 [수정] 다크모드 초기값을 false로 설정
   const [isDarkMode, setIsDarkMode] = useState(false);
 
   // 1. 데이터 구독 (useEffect)
@@ -1045,188 +1045,62 @@ function AppContent({ user }) {
   }, [user]);
 
   // 2. 헬퍼 함수들
-  const checkNotifications = (items) => {
-    if (!("Notification" in window)) return;
-    if (Notification.permission !== "granted") return;
-  };
+  const checkNotifications = (items) => { if ("Notification" in window && Notification.permission === "granted") {} };
+  const requestNotiPermission = () => { if ("Notification" in window) Notification.requestPermission(); };
+  const addItem = async (item) => { try { await addDoc(collection(db, `users/${user.uid}/ingredients`), { ...item, addedDate: new Date(), expiry: item.expiry, price: Number(item.price) || 0 }); toast.success(`${item.name} 냉장고에 쏙! 🥬`, { icon: '✅' }); setActiveTab('list'); } catch (e) { toast.error("오류: " + e.message); } };
+  const moveToTrash = async (ids) => { const batch = writeBatch(db); ids.forEach(id => { const item = ingredients.find(i => i.id === id); if (item) { const { id: itemId, ...itemData } = item; const trashRef = doc(collection(db, `users/${user.uid}/trash`)); batch.set(trashRef, { ...itemData, deletedAt: new Date() }); const historyRef = doc(collection(db, `users/${user.uid}/history`)); batch.set(historyRef, { name: item.name, action: 'wasted', price: Number(item.price) || 0, date: new Date() }); const ingRef = doc(db, `users/${user.uid}/ingredients`, id); batch.delete(ingRef); } }); await batch.commit(); };
+  const consumeItem = async (ids) => { const batch = writeBatch(db); ids.forEach(id => { const item = ingredients.find(i => i.id === id); if (item) { const historyRef = doc(collection(db, `users/${user.uid}/history`)); batch.set(historyRef, { name: item.name, action: 'used', price: Number(item.price) || 0, date: new Date() }); const ingRef = doc(db, `users/${user.uid}/ingredients`, id); batch.delete(ingRef); } }); await batch.commit(); }
+  const resetHistory = async () => { if (!confirm("정말 통계 기록을 초기화하시겠습니까?")) return; try { const q = query(collection(db, `users/${user.uid}/history`)); const snapshot = await getDocs(q); const batch = writeBatch(db); snapshot.docs.forEach((doc) => batch.delete(doc.ref)); await batch.commit(); toast.success("통계 초기화 완료!"); } catch (e) { toast.error("초기화 실패"); } };
+  const resetFridge = async () => { if (!confirm("정말 냉장고를 초기화하시겠습니까?")) return; try { const q = query(collection(db, `users/${user.uid}/ingredients`)); const snapshot = await getDocs(q); const batch = writeBatch(db); snapshot.docs.forEach((doc) => batch.delete(doc.ref)); await batch.commit(); toast.success("냉장고 초기화 완료!"); } catch (e) { toast.error("초기화 실패"); } };
+  const restoreFromTrash = async (item) => { const batch = writeBatch(db); const ingRef = doc(collection(db, `users/${user.uid}/ingredients`)); const { id, deletedAt, ...rest } = item; batch.set(ingRef, { ...rest }); const trashRef = doc(db, `users/${user.uid}/trash`, item.id); batch.delete(trashRef); await batch.commit(); toast.success("복구되었습니다!"); };
+  const permanentDelete = async (id) => { await deleteDoc(doc(db, `users/${user.uid}/trash`, id)); toast.success("영구 삭제됨"); };
+  const updateIngredient = async (id, data) => { try { await updateDoc(doc(db, `users/${user.uid}/ingredients`, id), data); } catch (e) { toast.error("수정 실패"); } };
+  const updateCartItemDetail = async (id, data) => { await updateDoc(doc(db, `users/${user.uid}/cart`, id), data); };
+  const updateCartCount = async (name, delta) => { const existing = cart.find(c => c.name === name); if (!existing) return; const newCount = existing.count + delta; if (newCount <= 0) await deleteDoc(doc(db, `users/${user.uid}/cart`, existing.id)); else await updateDoc(doc(db, `users/${user.uid}/cart`, existing.id), { count: newCount }); };
+  const removeItemsFromCart = async (names) => { const itemsToRemove = cart.filter(c => names.includes(c.name)); for (const item of itemsToRemove) await deleteDoc(doc(db, `users/${user.uid}/cart`, item.id)); };
+  const checkoutCartItems = async (selectedNames) => { const itemsToCheckout = cart.filter(item => selectedNames.includes(item.name)); const batch = writeBatch(db); itemsToCheckout.forEach(item => { let dbEntry = SHELF_LIFE_DB[item.name] || SHELF_LIFE_DB[item.name.toLowerCase()] || SHELF_LIFE_DB['default']; if (!dbEntry) dbEntry = { fridge: 7, price: 3000 }; let shelfLife = dbEntry.fridge || 7; let storage = 'fridge'; if (!dbEntry.fridge && dbEntry.freezer) storage = 'freezer'; const expiry = new Date(); expiry.setDate(expiry.getDate() + shelfLife); for(let i=0; i<item.count; i++) { const newRef = doc(collection(db, `users/${user.uid}/ingredients`)); batch.set(newRef, { name: item.name, category: storage, expiry: expiry, addedDate: new Date(), price: item.price !== undefined ? Number(item.price) : (dbEntry.price || 0), amount: item.amount !== undefined ? Number(item.amount) : 0, unit: item.unit || 'g' }); } const cartRef = doc(db, `users/${user.uid}/cart`, item.id); batch.delete(cartRef); }); await batch.commit(); toast.success("냉장고로 이동 완료!"); setActiveTab('list'); };
+  const getRiskLevel = (expiryDate, itemName = '') => { if (!expiryDate) return 'safe'; const today = new Date(); today.setHours(0,0,0,0); const expiry = new Date(expiryDate); expiry.setHours(0,0,0,0); const diffDays = Math.ceil((expiry - today) / (1000 * 60 * 60 * 24)); const settings = SHELF_LIFE_DB[itemName] || SHELF_LIFE_DB[itemName.replace(/\s+/g, '')] || SHELF_LIFE_DB['default'] || { risk: { danger: 3, warning: 7 } }; const { danger, warning } = settings.risk || { danger: 3, warning: 7 }; if (diffDays < 0) return 'expired'; if (diffDays <= danger) return 'danger'; if (diffDays <= warning) return 'warning'; return 'safe'; };
 
-  const addItem = async (item) => {
-    try { 
-      await addDoc(collection(db, `users/${user.uid}/ingredients`), { ...item, addedDate: new Date(), expiry: item.expiry, price: Number(item.price) || 0 }); 
-      toast.success(`${item.name} 냉장고에 쏙! 🥬`, { icon: '✅' });
-      setActiveTab('list'); 
-    } catch (e) { toast.error("오류: " + e.message); }
-  };
+  // 🟢 [수정] addToCart 함수 개선 (이름 또는 객체 모두 처리 가능)
+  const addToCart = async (input) => {
+    let name, amount = 0, unit = 'g';
 
-  const moveToTrash = async (ids) => {
-    const batch = writeBatch(db);
-    ids.forEach(id => {
-      const item = ingredients.find(i => i.id === id);
-      if (item) {
-        const { id: itemId, ...itemData } = item;
-        const trashRef = doc(collection(db, `users/${user.uid}/trash`));
-        batch.set(trashRef, { ...itemData, deletedAt: new Date() });
-        
-        const historyRef = doc(collection(db, `users/${user.uid}/history`));
-        batch.set(historyRef, { name: item.name, action: 'wasted', price: Number(item.price) || 0, date: new Date() });
+    if (typeof input === 'string') {
+        name = input; // 기존 방식 (문자열만 올 때)
+    } else {
+        name = input.name; // 객체로 올 때 (이름, 양, 단위 포함)
+        amount = input.amount || 0;
+        unit = input.unit || 'g';
+    }
 
-        const ingRef = doc(db, `users/${user.uid}/ingredients`, id);
-        batch.delete(ingRef);
-      }
-    });
-    await batch.commit();
-  };
-
-  const consumeItem = async (ids) => {
-      const batch = writeBatch(db);
-      ids.forEach(id => {
-          const item = ingredients.find(i => i.id === id);
-          if (item) {
-              const historyRef = doc(collection(db, `users/${user.uid}/history`));
-              batch.set(historyRef, { name: item.name, action: 'used', price: Number(item.price) || 0, date: new Date() });
-              const ingRef = doc(db, `users/${user.uid}/ingredients`, id);
-              batch.delete(ingRef);
-          }
-      });
-      await batch.commit();
-  }
-
-  const resetHistory = async () => {
-    if (!confirm("정말 통계 기록을 초기화하시겠습니까?")) return;
-    try {
-      const q = query(collection(db, `users/${user.uid}/history`));
-      const snapshot = await getDocs(q);
-      const batch = writeBatch(db);
-      snapshot.docs.forEach((doc) => batch.delete(doc.ref));
-      await batch.commit();
-      toast.success("통계 초기화 완료!");
-    } catch (e) { toast.error("초기화 실패"); }
-  };
-
-  const resetFridge = async () => {
-    if (!confirm("정말 냉장고를 초기화하시겠습니까?")) return;
-    try {
-      const q = query(collection(db, `users/${user.uid}/ingredients`));
-      const snapshot = await getDocs(q);
-      const batch = writeBatch(db);
-      snapshot.docs.forEach((doc) => batch.delete(doc.ref));
-      await batch.commit();
-      toast.success("냉장고 초기화 완료!");
-    } catch (e) { toast.error("초기화 실패"); }
-  };
-
-  const restoreFromTrash = async (item) => {
-    const batch = writeBatch(db);
-    const ingRef = doc(collection(db, `users/${user.uid}/ingredients`));
-    const { id, deletedAt, ...rest } = item;
-    batch.set(ingRef, { ...rest });
-    const trashRef = doc(db, `users/${user.uid}/trash`, item.id);
-    batch.delete(trashRef);
-    await batch.commit();
-    toast.success("복구되었습니다!");
-  };
-
-  const permanentDelete = async (id) => {
-    await deleteDoc(doc(db, `users/${user.uid}/trash`, id));
-    toast.success("영구 삭제됨");
-  };
-
-  const updateIngredient = async (id, data) => {
-    try { await updateDoc(doc(db, `users/${user.uid}/ingredients`, id), data); } catch (e) { toast.error("수정 실패"); }
-  };
-
-  const updateCartItemDetail = async (id, data) => {
-    await updateDoc(doc(db, `users/${user.uid}/cart`, id), data);
-  };
-
-  const updateCartCount = async (name, delta) => { 
     const existing = cart.find(c => c.name === name);
-    if (!existing) return;
-    const newCount = existing.count + delta;
-    if (newCount <= 0) await deleteDoc(doc(db, `users/${user.uid}/cart`, existing.id));
-    else await updateDoc(doc(db, `users/${user.uid}/cart`, existing.id), { count: newCount });
-  };
-
-  const removeItemsFromCart = async (names) => { 
-    const itemsToRemove = cart.filter(c => names.includes(c.name));
-    for (const item of itemsToRemove) await deleteDoc(doc(db, `users/${user.uid}/cart`, item.id));
-  };
-
-  const addToCart = async (name) => {
-    const existing = cart.find(c => c.name === name);
-    if (existing) await updateDoc(doc(db, `users/${user.uid}/cart`, existing.id), { count: existing.count + 1 });
-    else await addDoc(collection(db, `users/${user.uid}/cart`), { name, count: 1 });
-    toast.success("장바구니에 담았어요 🛒");
-  };
-
-  const checkoutCartItems = async (selectedNames) => { 
-    const itemsToCheckout = cart.filter(item => selectedNames.includes(item.name));
-    const batch = writeBatch(db);
-
-    itemsToCheckout.forEach(item => {
-      let dbEntry = SHELF_LIFE_DB[item.name] || SHELF_LIFE_DB[item.name.toLowerCase()] || SHELF_LIFE_DB['default'];
-      if (!dbEntry) dbEntry = { fridge: 7, price: 3000 }; 
-
-      let shelfLife = dbEntry.fridge || 7;
-      let storage = 'fridge';
-      if (!dbEntry.fridge && dbEntry.freezer) storage = 'freezer';
-      
-      const expiry = new Date();
-      expiry.setDate(expiry.getDate() + shelfLife);
-
-      for(let i=0; i<item.count; i++) {
-        const newRef = doc(collection(db, `users/${user.uid}/ingredients`));
-        batch.set(newRef, {
-          name: item.name, 
-          category: storage, 
-          expiry: expiry, 
-          addedDate: new Date(),
-          price: item.price !== undefined ? Number(item.price) : (dbEntry.price || 0),
-          amount: item.amount !== undefined ? Number(item.amount) : 0,
-          unit: item.unit || 'g'
+    if (existing) {
+        // 이미 있으면 수량 증가 + 용량 업데이트(선택 사항)
+        await updateDoc(doc(db, `users/${user.uid}/cart`, existing.id), { 
+            count: existing.count + 1,
+            amount: amount > 0 ? amount : existing.amount, // 새로운 용량 정보가 있으면 업데이트
+            unit: unit !== 'g' ? unit : existing.unit 
         });
-      }
-      const cartRef = doc(db, `users/${user.uid}/cart`, item.id);
-      batch.delete(cartRef);
-    });
-    
-    await batch.commit();
-    toast.success("냉장고로 이동 완료!");
-    setActiveTab('list');
+    } else {
+        await addDoc(collection(db, `users/${user.uid}/cart`), { name, count: 1, amount, unit });
+    }
+    toast.success(`${name} 장바구니에 담았어요 🛒`);
   };
 
-  const getRiskLevel = (expiryDate, itemName = '') => {
-    if (!expiryDate) return 'safe';
-    const today = new Date();
-    today.setHours(0,0,0,0);
-    const expiry = new Date(expiryDate);
-    expiry.setHours(0,0,0,0);
-    
-    const diffDays = Math.ceil((expiry - today) / (1000 * 60 * 60 * 24));
-    const settings = SHELF_LIFE_DB[itemName] || SHELF_LIFE_DB[itemName.replace(/\s+/g, '')] || SHELF_LIFE_DB['default'] || { risk: { danger: 3, warning: 7 } };
-    const { danger, warning } = settings.risk || { danger: 3, warning: 7 };
-
-    if (diffDays < 0) return 'expired';
-    if (diffDays <= danger) return 'danger'; 
-    if (diffDays <= warning) return 'warning'; 
-    return 'safe';
-  };
-
-  // 3. 렌더링 (반응형 + 다크모드 적용)
   return (
-    <div className={`${isDarkMode ? 'dark' : ''}`}> {/* 🟢 다크모드 Wrapper */}
+    // 🟢 [수정] 다크모드 클래스 적용 방식 명확화
+    <div className={isDarkMode ? "dark" : ""}>
       <div className="min-h-screen bg-gray-100 dark:bg-gray-900 font-sans flex justify-center text-gray-800 dark:text-gray-100 transition-colors duration-300">
         <Toaster position="top-center" toastOptions={{ style: { borderRadius: '20px', background: isDarkMode ? '#333' : '#222', color: '#fff', fontSize: '14px' } }} />
 
         <div className="w-full md:max-w-6xl md:grid md:grid-cols-[400px_1fr] md:gap-8 md:p-8 h-screen md:h-auto">
-          
-          {/* 왼쪽: 모바일 메인 / PC 사이드바 */}
+          {/* 왼쪽 컨텐츠 */}
           <div className="bg-white dark:bg-gray-800 md:rounded-[30px] shadow-2xl flex flex-col h-full md:h-[85vh] overflow-hidden border-x md:border-0 relative max-w-md mx-auto md:mx-0 w-full transition-colors">
             <header className="bg-green-600 text-white p-5 pt-6 shadow-md z-10 flex justify-between items-center">
               <div><h1 className="text-xl font-bold flex items-center gap-2"><Refrigerator /> Fresh Calendar</h1><p className="text-green-100 text-xs mt-1 opacity-80">{user.email}</p></div>
               <div className="flex gap-2">
-                {/* 🟢 다크모드 버튼 */}
-                <button onClick={() => setIsDarkMode(!isDarkMode)} className="p-2 bg-green-700 rounded-full hover:bg-green-800 transition-colors">
+                {/* 🟢 [수정] 토글 버튼 로직 확인 */}
+                <button onClick={() => setIsDarkMode(prev => !prev)} className="p-2 bg-green-700 rounded-full hover:bg-green-800 transition-colors">
                     {isDarkMode ? <Sun size={18} /> : <Moon size={18} />}
                 </button>
                 <button onClick={resetFridge} className="p-2 bg-green-700 rounded-full hover:bg-red-600 transition-colors" title="초기화"><RefreshCcw size={18} /></button>
@@ -1240,17 +1114,7 @@ function AppContent({ user }) {
               {activeTab === 'list' && <FridgeListView ingredients={ingredients} getRiskLevel={getRiskLevel} moveToTrash={moveToTrash} consumeItem={consumeItem} updateIngredient={updateIngredient} onOpenTrash={() => setActiveTab('trash')} />}
               {activeTab === 'trash' && <TrashView trashItems={trashItems} onRestore={restoreFromTrash} onPermanentDelete={permanentDelete} onClose={() => setActiveTab('list')} />}
               {activeTab === 'recipes' && <RecipeView ingredients={ingredients} onAddToCart={addToCart} recipes={RECIPE_FULL_DB} user={user} />} 
-              {activeTab === 'cart' && ( 
-                  <ShoppingCartView 
-                    cart={cart} 
-                    ingredients={ingredients} // 🟢 [중요] 중복 체크를 위해 재료 목록 전달
-                    onUpdateCount={updateCartCount} 
-                    onRemove={removeItemsFromCart} 
-                    onCheckout={checkoutCartItems} 
-                    onUpdateDetail={updateCartItemDetail} 
-                    onAdd={addToCart}
-                  /> 
-              )}
+              {activeTab === 'cart' && <ShoppingCartView cart={cart} ingredients={ingredients} onUpdateCount={updateCartCount} onRemove={removeItemsFromCart} onCheckout={checkoutCartItems} onUpdateDetail={updateCartItemDetail} onAdd={addToCart} />}
               {activeTab === 'stats' && <InsightsView ingredients={ingredients} onAddToCart={addToCart} history={historyItems} onResetHistory={resetHistory} />}
               {activeTab === 'add' && <AddItemModal onClose={() => setActiveTab('calendar')} onAdd={addItem} initialDate={selectedDateForAdd} />}
             </main>
@@ -1264,7 +1128,7 @@ function AppContent({ user }) {
             </nav>
           </div>
 
-          {/* 오른쪽: PC 전용 대시보드 */}
+          {/* 오른쪽 컨텐츠 */}
           <div className="hidden md:flex flex-col gap-6 h-[85vh]">
             <div className="bg-white dark:bg-gray-800 rounded-[30px] shadow-xl p-8 flex-1 overflow-y-auto transition-colors">
               <h2 className="text-2xl font-bold mb-6 text-gray-800 dark:text-gray-100 flex items-center gap-2"><TrendingUp className="text-green-600" /> 나의 키친 대시보드</h2>
@@ -1279,7 +1143,6 @@ function AppContent({ user }) {
               </div>
             </div>
           </div>
-
         </div>
       </div>
     </div>
@@ -1757,23 +1620,20 @@ function ShoppingCartView({ cart, ingredients, onUpdateCount, onRemove, onChecko
   );
 }
 
-// --- 레시피 뷰 (수정됨: 재료 개별 선택 기능 추가) ---
+// --- 레시피 뷰 (수정 완료: 인분 조절 UI, 용량 연동, 다크모드) ---
 function RecipeView({ ingredients, onAddToCart, recipes, user }) {
   const [activeTab, setActiveTab] = useState('default'); 
   const [myRecipes, setMyRecipes] = useState([]);
-  
-  // 냉장고 보유 재료 필터링용 (목록 화면용)
   const [selectedIngredients, setSelectedIngredients] = useState([]);
   const [selectedRecipe, setSelectedRecipe] = useState(null);
   
-  // 🟢 [New] 상세화면에서 장바구니에 담을 재료 선택 상태
+  // 상세화면 상태
   const [ingredientsToBuy, setIngredientsToBuy] = useState([]);
-
-  // 인분 조절 및 조리 모드 상태
   const [servings, setServings] = useState(1); 
   const [isCookingMode, setIsCookingMode] = useState(false);
   const [currentStep, setCurrentStep] = useState(0);
 
+  // 내 레시피 불러오기
   useEffect(() => {
     if(!user) return;
     const q = query(collection(db, `users/${user.uid}/recipes`));
@@ -1783,7 +1643,7 @@ function RecipeView({ ingredients, onAddToCart, recipes, user }) {
     return () => unsub();
   }, [user]);
 
-  // 🟢 [New] 레시피가 열릴 때 "없는 재료"만 자동으로 선택 상태로 만들기
+  // 레시피 열 때 없는 재료 자동 선택
   useEffect(() => {
     if (selectedRecipe) {
         const missing = selectedRecipe.ingredients.filter(ing => 
@@ -1793,79 +1653,76 @@ function RecipeView({ ingredients, onAddToCart, recipes, user }) {
     }
   }, [selectedRecipe, ingredients]);
 
-  // 🟢 [New] 재료 칩 클릭 시 선택/해제 토글
-  const toggleIngredientToBuy = (ingName) => {
-      if (ingredientsToBuy.includes(ingName)) {
-          setIngredientsToBuy(prev => prev.filter(i => i !== ingName));
-      } else {
-          setIngredientsToBuy(prev => [...prev, ingName]);
-      }
+  // 재료명 매칭 헬퍼
+  const matchIngredient = (r, u) => { 
+      const rr=r.replace(/\s/g,''), uu=u.replace(/\s/g,''); 
+      if(rr===uu) return true; 
+      return rr.includes(uu)||uu.includes(rr); 
   };
 
-  // 🟢 [New] 선택된 재료만 장바구니 담기
+  // 재료 칩 선택 토글
+  const toggleIngredientToBuy = (ingName) => {
+      if (ingredientsToBuy.includes(ingName)) setIngredientsToBuy(prev => prev.filter(i => i !== ingName));
+      else setIngredientsToBuy(prev => [...prev, ingName]);
+  };
+
+  // 🟢 [핵심 수정] 텍스트에서 용량(숫자)과 단위 추출
+  const extractAmountAndUnit = (ingName, measureText) => {
+      if (!measureText) return { amount: 0, unit: 'g' };
+      
+      // 정규식: 재료명 근처에 있는 숫자와 단위(g, kg, ml, L, 개, 봉, T, 컵 등)를 찾음
+      // 예: "돼지고기 300g" -> 300, g 추출
+      try {
+        const regex = new RegExp(`${ingName}.*?([0-9.]+)\\s*(g|kg|ml|L|개|봉|t|T|컵|쪽|마리)`, 'i');
+        const match = measureText.match(regex);
+        
+        if (match) {
+            let amount = parseFloat(match[1]);
+            // 현재 설정된 인분 수(servings)에 맞춰 곱하기
+            amount = amount * servings;
+            
+            // 소수점 정리 (정수면 그대로, 소수면 1자리까지)
+            return { 
+                amount: Number.isInteger(amount) ? amount : Number(amount.toFixed(1)), 
+                unit: match[2] 
+            };
+        }
+      } catch (e) {
+          console.error("Regex parsing error", e);
+      }
+      return { amount: 0, unit: 'g' };
+  };
+
+  // 🟢 [핵심 수정] 선택한 재료 장바구니 담기 (용량 포함)
   const handleAddSelectedToCart = () => {
       if(ingredientsToBuy.length === 0) {
           toast.error('담을 재료를 선택해주세요!');
           return;
       }
-      ingredientsToBuy.forEach(item => onAddToCart(item));
-      toast.success(`${ingredientsToBuy.length}개 재료를 장바구니에 담았습니다!`);
-  };
-
-  const addMyRecipe = async () => {
-    const name = prompt("🍳 레시피 이름이 무엇인가요?");
-    if(!name) return;
-    const ingreds = prompt("🥕 필요한 재료를 쉼표(,)로 구분해 적어주세요\n(예: 김치, 돼지고기, 두부)");
-    const steps = prompt("📝 조리법을 단계별로 적어주세요 (줄바꿈 불가능하니 한 줄로 요약하거나 1. 2. 번호로 적어주세요)");
-    
-    try {
-        await addDoc(collection(db, `users/${user.uid}/recipes`), {
-            name, category: 'My',
-            ingredients: ingreds ? ingreds.split(',').map(s=>s.trim()) : [],
-            measure: ingreds || '',
-            steps: steps ? [steps] : ['자유롭게 조리하세요!']
-        });
-        toast.success('나만의 레시피가 추가되었습니다!');
-    } catch(e) { toast.error('저장 실패'); }
-  };
-
-  const getIngredientUrgency = (ingName) => {
-    const matchedItems = ingredients.filter(i => matchIngredient(ingName, i.name));
-    if (matchedItems.length === 0) return 0;
-    const hasDanger = matchedItems.some(i => {
-       const today = new Date(); today.setHours(0,0,0,0);
-       const exp = new Date(i.expiry); exp.setHours(0,0,0,0);
-       const diff = (exp - today) / (1000 * 60 * 60 * 24);
-       return diff <= 3;
-    });
-    return hasDanger ? 5 : 1; 
-  };
-
-  const matchIngredient = (r, u) => { const rr=r.replace(/\s/g,''), uu=u.replace(/\s/g,''); if(rr===uu)return true; return rr.includes(uu)||uu.includes(rr); };
-  
-  const allRecipes = activeTab === 'default' ? recipes : myRecipes;
-  
-  const matchedRecipes = allRecipes.map(recipe => {
-      const existing = recipe.ingredients.filter(req => selectedIngredients.some(sel => matchIngredient(req, sel)));
-      const missing = recipe.ingredients.filter(req => !selectedIngredients.some(sel => matchIngredient(req, sel)));
       
-      let urgencyScore = 0;
-      recipe.ingredients.forEach(ing => { if(selectedIngredients.includes(ing)) urgencyScore += getIngredientUrgency(ing); });
-      
-      return { ...recipe, existing, missing, score: existing.length + urgencyScore };
-  }).sort((a, b) => b.score - a.score);
+      let addedCount = 0;
+      ingredientsToBuy.forEach(item => {
+          // measure 텍스트에서 용량 정보 추출
+          const { amount, unit } = extractAmountAndUnit(item, selectedRecipe.measure);
+          
+          // AppContent의 addToCart로 객체 전달
+          onAddToCart({ name: item, amount, unit });
+          addedCount++;
+      });
+      toast.success(`${addedCount}개 재료를 장바구니에 담았습니다!`);
+  };
 
-  const toggleSelection = (name) => { if (selectedIngredients.includes(name)) setSelectedIngredients(selectedIngredients.filter(i => i !== name)); else setSelectedIngredients([...selectedIngredients, name]); };
-  const toggleSelectAll = () => { if (selectedIngredients.length === ingredients.length && ingredients.length > 0) setSelectedIngredients([]); else setSelectedIngredients(ingredients.map(i => i.name)); };
-  
+  // 텍스트 내 숫자 스케일링 (화면 표시용)
   const scaleText = (text, factor) => {
      if (factor === 1 || !text) return text;
      return text.replace(/(\d+(\.\d+)?)/g, (match) => {
         const num = parseFloat(match);
+        // 날짜(2023...)나 순서(1.) 등은 제외하면 좋겠지만 간단하게 모든 숫자 변환
         return Number.isInteger(num * factor) ? (num * factor) : (num * factor).toFixed(1);
      });
   };
 
+  // 조리 모드 토글 (Wake Lock)
   const toggleCookingMode = async () => {
      if (!isCookingMode) {
         try {
@@ -1881,7 +1738,54 @@ function RecipeView({ ingredients, onAddToCart, recipes, user }) {
      }
   };
 
-  // 1. 조리 모드 뷰
+  // 나만의 레시피 추가
+  const addMyRecipe = async () => {
+    const name = prompt("🍳 레시피 이름이 무엇인가요?");
+    if(!name) return;
+    const ingreds = prompt("🥕 필요한 재료를 쉼표(,)로 구분해 적어주세요\n(예: 김치, 돼지고기, 두부)");
+    const steps = prompt("📝 조리법을 단계별로 적어주세요");
+    try {
+        await addDoc(collection(db, `users/${user.uid}/recipes`), {
+            name, category: 'My',
+            ingredients: ingreds ? ingreds.split(',').map(s=>s.trim()) : [],
+            measure: ingreds || '',
+            steps: steps ? [steps] : ['자유롭게 조리하세요!']
+        });
+        toast.success('레시피가 추가되었습니다!');
+    } catch(e) { toast.error('저장 실패'); }
+  };
+
+  // 유통기한 임박도 계산
+  const getIngredientUrgency = (ingName) => {
+    const matchedItems = ingredients.filter(i => matchIngredient(ingName, i.name));
+    if (matchedItems.length === 0) return 0;
+    const hasDanger = matchedItems.some(i => {
+       const today = new Date(); today.setHours(0,0,0,0);
+       const exp = new Date(i.expiry); exp.setHours(0,0,0,0);
+       const diff = (exp - today) / (1000 * 60 * 60 * 24);
+       return diff <= 3;
+    });
+    return hasDanger ? 5 : 1; 
+  };
+  
+  const allRecipes = activeTab === 'default' ? recipes : myRecipes;
+  
+  // 레시피 정렬 로직
+  const matchedRecipes = allRecipes.map(recipe => {
+      const existing = recipe.ingredients.filter(req => selectedIngredients.some(sel => matchIngredient(req, sel)));
+      const missing = recipe.ingredients.filter(req => !selectedIngredients.some(sel => matchIngredient(req, sel)));
+      
+      let urgencyScore = 0;
+      recipe.ingredients.forEach(ing => { if(selectedIngredients.includes(ing)) urgencyScore += getIngredientUrgency(ing); });
+      
+      return { ...recipe, existing, missing, score: existing.length + urgencyScore };
+  }).sort((a, b) => b.score - a.score);
+
+  const toggleSelection = (name) => { if (selectedIngredients.includes(name)) setSelectedIngredients(selectedIngredients.filter(i => i !== name)); else setSelectedIngredients([...selectedIngredients, name]); };
+  const toggleSelectAll = () => { if (selectedIngredients.length === ingredients.length && ingredients.length > 0) setSelectedIngredients([]); else setSelectedIngredients(ingredients.map(i => i.name)); };
+
+
+  // --- 1. 조리 모드 뷰 ---
   if (isCookingMode && selectedRecipe) {
      const scaledSteps = selectedRecipe.steps.map(s => scaleText(s, servings));
      return (
@@ -1906,10 +1810,11 @@ function RecipeView({ ingredients, onAddToCart, recipes, user }) {
      );
   }
 
-  // 2. 레시피 상세 화면
+  // --- 2. 레시피 상세 화면 ---
   if (selectedRecipe) {
       return (
         <div className="p-4 pb-24 h-full bg-white dark:bg-gray-900 flex flex-col overflow-y-auto transition-colors">
+            {/* 상단바 */}
             <div className="sticky top-0 bg-white dark:bg-gray-900 z-10 pb-4 border-b dark:border-gray-700 mb-4">
                <button onClick={() => { setSelectedRecipe(null); setServings(1); }} className="text-gray-500 dark:text-gray-400 flex items-center gap-2 mb-2 hover:text-green-600 font-bold">
                    <ArrowLeft size={20}/> 목록으로 돌아가기
@@ -1926,17 +1831,17 @@ function RecipeView({ ingredients, onAddToCart, recipes, user }) {
                </div>
             </div>
             
-            {/* 인분 조절기 */}
+            {/* 🟢 [수정됨] 인분 조절기 (디자인 깨짐 해결: min-w, whitespace-nowrap 추가) */}
             <div className="bg-green-50 dark:bg-gray-800 p-4 rounded-2xl mb-6 border border-green-100 dark:border-gray-700 flex items-center justify-between">
                <span className="font-bold text-green-800 dark:text-green-400 flex items-center gap-2"><Users size={18}/> 기준 인원</span>
                <div className="flex items-center bg-white dark:bg-gray-700 rounded-lg shadow-sm">
                   <button onClick={() => setServings(Math.max(1, servings - 1))} className="p-2 px-3 hover:bg-gray-100 dark:hover:bg-gray-600 rounded-l-lg dark:text-white">-</button>
-                  <span className="px-4 font-bold text-lg w-16 text-center dark:text-white">{servings}인분</span>
+                  <span className="px-2 min-w-[4rem] text-center font-bold text-lg dark:text-white whitespace-nowrap">{servings}인분</span>
                   <button onClick={() => setServings(servings + 1)} className="p-2 px-3 hover:bg-gray-100 dark:hover:bg-gray-600 rounded-r-lg dark:text-white">+</button>
                </div>
             </div>
 
-            {/* 🟢 [Changed] 재료 섹션: 선택/해제 기능 적용 */}
+            {/* 재료 선택 및 담기 */}
             <div className="mb-8">
                 <div className="flex justify-between items-center mb-3">
                     <h3 className="text-lg font-bold flex items-center gap-2 dark:text-white"><ShoppingCart size={18}/> 재료 선택</h3>
@@ -1977,6 +1882,7 @@ function RecipeView({ ingredients, onAddToCart, recipes, user }) {
                 <p className="text-[10px] text-gray-400 mt-2 ml-1 text-right">* 파란색 테두리가 장바구니에 담길 재료입니다.</p>
             </div>
 
+            {/* 조리 순서 */}
             <div className="mb-8">
                <h3 className="text-lg font-bold flex items-center gap-2 mb-4 dark:text-white"><ChefHat size={18}/> 조리 순서</h3>
                <div className="space-y-4">
@@ -1998,7 +1904,7 @@ function RecipeView({ ingredients, onAddToCart, recipes, user }) {
       );
   }
 
-  // 3. 레시피 목록 화면
+  // --- 3. 레시피 목록 화면 ---
   return (
       <div className="p-4 pb-24 h-full flex flex-col bg-white dark:bg-gray-900 transition-colors">
         <div className="flex justify-between items-center mb-6">
