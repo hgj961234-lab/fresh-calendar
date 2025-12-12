@@ -1002,8 +1002,8 @@ function AuthScreen() {
   );
 }
 
-// --- PC용 사이드바 컴포넌트 (새로 추가) ---
-function DesktopSidebar({ activeTab, setActiveTab, cartCount, isDarkMode, setIsDarkMode, onReset, onLogout, onAddRequest }) {
+// --- 1. PC용 사이드바 (다크모드 제거 & 알림/초기화 버튼 추가됨) ---
+function DesktopSidebar({ activeTab, setActiveTab, cartCount, onReset, onLogout, onAddRequest, onNotiRequest }) {
   const menuItems = [
     { id: 'calendar', icon: <Calendar />, label: '달력' },
     { id: 'list', icon: <Refrigerator />, label: '냉장고' },
@@ -1013,9 +1013,9 @@ function DesktopSidebar({ activeTab, setActiveTab, cartCount, isDarkMode, setIsD
   ];
 
   return (
-    <aside className="hidden md:flex flex-col w-64 h-[85vh] bg-white dark:bg-gray-800 rounded-[30px] shadow-xl p-6 mr-6 transition-colors border dark:border-gray-700">
+    <aside className="hidden md:flex flex-col w-64 h-[85vh] bg-white rounded-[30px] shadow-xl p-6 mr-6 border border-gray-100">
       <div className="mb-8 px-2">
-        <h1 className="text-2xl font-bold text-green-600 dark:text-green-400 flex items-center gap-2">
+        <h1 className="text-2xl font-bold text-green-600 flex items-center gap-2">
           <Refrigerator className="w-8 h-8" />
           Fresh<br/>Calendar
         </h1>
@@ -1028,8 +1028,8 @@ function DesktopSidebar({ activeTab, setActiveTab, cartCount, isDarkMode, setIsD
             onClick={() => setActiveTab(item.id)}
             className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all font-bold ${
               activeTab === item.id
-                ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 shadow-sm'
-                : 'text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700'
+                ? 'bg-green-100 text-green-700 shadow-sm'
+                : 'text-gray-500 hover:bg-gray-100'
             }`}
           >
             <div className="relative">
@@ -1045,18 +1045,21 @@ function DesktopSidebar({ activeTab, setActiveTab, cartCount, isDarkMode, setIsD
         ))}
       </nav>
 
-      <div className="pt-6 border-t dark:border-gray-700 space-y-2">
+      <div className="pt-6 border-t space-y-2">
         <button onClick={() => onAddRequest(new Date())} className="w-full bg-green-600 hover:bg-green-700 text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2 shadow-md transition-colors">
             <Plus size={20} /> 빠른 추가
         </button>
         <div className="flex gap-2 mt-4">
-             <button onClick={() => setIsDarkMode(!isDarkMode)} className="flex-1 p-2 rounded-xl bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors flex justify-center">
-                {isDarkMode ? <Sun size={20}/> : <Moon size={20}/>}
+            {/* 🔔 알림 버튼 복구 */}
+            <button onClick={onNotiRequest} className="flex-1 p-2 rounded-xl bg-yellow-50 text-yellow-600 hover:bg-yellow-100 transition-colors flex justify-center" title="알림 설정">
+                <Bell size={20}/>
             </button>
-            <button onClick={onReset} className="flex-1 p-2 rounded-xl bg-red-50 dark:bg-red-900/20 text-red-500 hover:bg-red-100 dark:hover:bg-red-900/40 transition-colors flex justify-center" title="초기화">
+            {/* 🔄 초기화 버튼 복구 */}
+            <button onClick={onReset} className="flex-1 p-2 rounded-xl bg-red-50 text-red-500 hover:bg-red-100 transition-colors flex justify-center" title="초기화">
                 <RefreshCcw size={20}/>
             </button>
-            <button onClick={onLogout} className="flex-1 p-2 rounded-xl bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors flex justify-center" title="로그아웃">
+            {/* 🚪 로그아웃 버튼 */}
+            <button onClick={onLogout} className="flex-1 p-2 rounded-xl bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors flex justify-center" title="로그아웃">
                 <LogOut size={20}/>
             </button>
         </div>
@@ -1065,7 +1068,80 @@ function DesktopSidebar({ activeTab, setActiveTab, cartCount, isDarkMode, setIsD
   );
 }
 
-// --- 수정된 AppContent ---
+// --- 2. 통계 뷰 (PC 가로 배치 수정됨) ---
+function InsightsView({ ingredients, onAddToCart, history, onResetHistory }) {
+  const totalUsed = history.filter(h => h.action === 'used').reduce((sum, item) => sum + (item.price || 0), 0);
+  const totalWasted = history.filter(h => h.action === 'wasted').reduce((sum, item) => sum + (item.price || 0), 0);
+  const rawSavings = Math.round(totalUsed * 0.6);
+  const netSavings = rawSavings - totalWasted;
+  
+  const usageCounts = history.filter(h => h.action === 'used').reduce((acc, item) => {
+      acc[item.name] = (acc[item.name] || 0) + 1;
+      return acc;
+  }, {});
+  const rankedItems = Object.entries(usageCounts).sort(([,a], [,b]) => b - a).slice(0, 5);
+  const formatMoney = (amount) => new Intl.NumberFormat('ko-KR').format(amount);
+
+  return (
+    <div className="p-4 pb-20 animate-in fade-in duration-500">
+      <div className="flex justify-between items-center mb-4">
+        <h2 className="text-lg font-bold flex items-center gap-2 text-gray-800">
+          <BarChart2 className="text-green-600" /> 통계 및 분석
+        </h2>
+        <button onClick={onResetHistory} className="text-xs bg-gray-100 text-gray-500 px-3 py-1.5 rounded-lg flex items-center gap-1 hover:bg-red-50 hover:text-red-600 transition-colors">
+          <RefreshCcw size={12} /> 기록 초기화
+        </button>
+      </div>
+      
+      {/* 🟢 [수정됨] PC에서는 가로(grid-cols-3), 모바일은 세로(grid-cols-1) 배치 */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      
+          {/* 카드 1: 절약 금액 */}
+          <div className={`p-6 rounded-3xl shadow-lg text-white relative overflow-hidden transition-colors ${netSavings >= 0 ? 'bg-gradient-to-br from-green-500 to-green-700' : 'bg-gradient-to-br from-red-500 to-red-700'}`}>
+            <div className="absolute top-0 right-0 p-8 opacity-10"><DollarSign size={100} /></div>
+            <div className="relative z-10">
+              <h3 className="font-medium text-green-100 mb-1 flex items-center gap-2">이번 달 순수 절약</h3>
+              <div className="text-3xl font-bold mb-4 flex items-baseline gap-1">
+                {formatMoney(netSavings)}<span className="text-sm font-normal">원</span>
+              </div>
+              <div className="bg-white/20 rounded-xl p-3 backdrop-blur-sm text-sm space-y-2">
+                 <div className="flex justify-between"><span>+사용</span><span>{formatMoney(rawSavings)}</span></div>
+                 <div className="flex justify-between text-red-100"><span>-폐기</span><span>{formatMoney(totalWasted)}</span></div>
+              </div>
+            </div>
+          </div>
+
+          {/* 카드 2: 현재 상태 */}
+          <div className="bg-white p-5 rounded-2xl border shadow-sm flex flex-col justify-center">
+            <h3 className="text-sm font-bold text-gray-500 mb-3 flex items-center gap-1"><PieChart size={14} /> 냉장고 현황</h3>
+            <div className="flex items-center justify-between px-2">
+                <div className="text-center"><div className="text-2xl font-bold text-green-600">{ingredients.length}</div><div className="text-xs text-gray-400">보관</div></div>
+                <div className="h-8 w-[1px] bg-gray-200"></div>
+                <div className="text-center"><div className="text-2xl font-bold text-blue-500">{history.filter(h=>h.action==='used').length}</div><div className="text-xs text-gray-400">소비</div></div>
+                <div className="h-8 w-[1px] bg-gray-200"></div>
+                <div className="text-center"><div className="text-2xl font-bold text-red-500">{history.filter(h=>h.action==='wasted').length}</div><div className="text-xs text-gray-400">폐기</div></div>
+            </div>
+          </div>
+
+          {/* 카드 3: 자주 먹은 재료 */}
+          <div className="bg-white p-5 rounded-2xl border shadow-sm">
+            <h3 className="text-sm font-bold text-gray-500 mb-4 flex items-center gap-1"><TrendingUp size={14} /> 자주 먹은 재료</h3>
+            <div className="space-y-3 max-h-40 overflow-y-auto pr-1">
+              {rankedItems.length > 0 ? rankedItems.map(([name, count], idx) => (
+                <div key={idx} className="flex justify-between items-center text-xs">
+                    <span className="font-bold text-gray-700">{idx+1}. {name}</span>
+                    <span className="text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">{count}회</span>
+                </div>
+              )) : <div className="text-center text-gray-400 text-xs py-4">기록 없음</div>}
+            </div>
+          </div>
+
+      </div>
+    </div>
+  );
+}
+
+// --- 3. 메인 AppContent (다크모드 제거 & 기능 연결 완료) ---
 function AppContent({ user }) {
   const [activeTab, setActiveTab] = useState('calendar');
   const [ingredients, setIngredients] = useState([]);
@@ -1073,9 +1149,8 @@ function AppContent({ user }) {
   const [trashItems, setTrashItems] = useState([]);
   const [historyItems, setHistoryItems] = useState([]);
   const [selectedDateForAdd, setSelectedDateForAdd] = useState(null);
-  const [isDarkMode, setIsDarkMode] = useState(false);
 
-  // 데이터 로드 로직 (기존과 동일)
+  // 1. 데이터 구독 (Firebase)
   useEffect(() => {
     const qIng = query(collection(db, `users/${user.uid}/ingredients`));
     const unsubIng = onSnapshot(qIng, (snap) => {
@@ -1086,22 +1161,26 @@ function AppContent({ user }) {
       setIngredients(items);
       checkExpiryAndNotify(items); 
     });
+
     const qCart = query(collection(db, `users/${user.uid}/cart`));
     const unsubCart = onSnapshot(qCart, (snap) => setCart(snap.docs.map(d => ({...d.data(), id: d.id}))));
+
     const qTrash = query(collection(db, `users/${user.uid}/trash`));
     const unsubTrash = onSnapshot(qTrash, (snap) => {
       const items = snap.docs.map(d => ({ ...d.data(), id: d.id, deletedAt: d.data().deletedAt?.toDate() }));
       setTrashItems(items);
     });
+
     const qHistory = query(collection(db, `users/${user.uid}/history`), orderBy('date', 'desc'));
     const unsubHistory = onSnapshot(qHistory, (snap) => {
         const items = snap.docs.map(d => ({ ...d.data(), id: d.id, date: d.data().date?.toDate() }));
         setHistoryItems(items);
     });
+
     return () => { unsubIng(); unsubCart(); unsubTrash(); unsubHistory(); };
   }, [user]);
 
-  // 알림 관련 함수 (기존과 동일)
+  // 2. 알림 기능 (복구됨)
   const requestNotificationPermission = () => {
     if (!("Notification" in window)) { toast.error("지원하지 않는 브라우저입니다."); return; }
     Notification.requestPermission().then((permission) => {
@@ -1123,97 +1202,243 @@ function AppContent({ user }) {
     }
   };
 
-  // 헬퍼 함수들 (기존과 동일하지만 공간 절약을 위해 생략하지 않음 - 그대로 사용)
-  const addItem = async (item) => { try { await addDoc(collection(db, `users/${user.uid}/ingredients`), { ...item, addedDate: new Date(), expiry: item.expiry, price: Number(item.price) || 0 }); toast.success(`${item.name} 저장 완료! 🥬`); setActiveTab('list'); } catch (e) { toast.error(e.message); } };
-  const moveToTrash = async (ids) => { const batch = writeBatch(db); ids.forEach(id => { const item = ingredients.find(i => i.id === id); if (item) { const { id: itemId, ...itemData } = item; const trashRef = doc(collection(db, `users/${user.uid}/trash`)); batch.set(trashRef, { ...itemData, deletedAt: new Date() }); const historyRef = doc(collection(db, `users/${user.uid}/history`)); batch.set(historyRef, { name: item.name, action: 'wasted', price: Number(item.price) || 0, date: new Date() }); const ingRef = doc(db, `users/${user.uid}/ingredients`, id); batch.delete(ingRef); } }); await batch.commit(); };
-  const consumeItem = async (ids) => { const batch = writeBatch(db); ids.forEach(id => { const item = ingredients.find(i => i.id === id); if (item) { const historyRef = doc(collection(db, `users/${user.uid}/history`)); batch.set(historyRef, { name: item.name, action: 'used', price: Number(item.price) || 0, date: new Date() }); const ingRef = doc(db, `users/${user.uid}/ingredients`, id); batch.delete(ingRef); } }); await batch.commit(); }
-  const resetHistory = async () => { if (!confirm("통계 기록을 초기화할까요?")) return; try { const q = query(collection(db, `users/${user.uid}/history`)); const snapshot = await getDocs(q); const batch = writeBatch(db); snapshot.docs.forEach((doc) => batch.delete(doc.ref)); await batch.commit(); toast.success("통계 초기화됨"); } catch (e) { toast.error("실패"); } };
-  const resetFridge = async () => { if (!confirm("냉장고를 싹 비울까요?")) return; try { const q = query(collection(db, `users/${user.uid}/ingredients`)); const snapshot = await getDocs(q); const batch = writeBatch(db); snapshot.docs.forEach((doc) => batch.delete(doc.ref)); await batch.commit(); toast.success("냉장고 초기화됨"); } catch (e) { toast.error("실패"); } };
-  const restoreFromTrash = async (item) => { const batch = writeBatch(db); const ingRef = doc(collection(db, `users/${user.uid}/ingredients`)); const { id, deletedAt, ...rest } = item; batch.set(ingRef, { ...rest }); const trashRef = doc(db, `users/${user.uid}/trash`, item.id); batch.delete(trashRef); await batch.commit(); toast.success("복구 완료!"); };
-  const permanentDelete = async (id) => { await deleteDoc(doc(db, `users/${user.uid}/trash`, id)); toast.success("영구 삭제됨"); };
-  const updateIngredient = async (id, data) => { try { await updateDoc(doc(db, `users/${user.uid}/ingredients`, id), data); } catch (e) { toast.error("수정 실패"); } };
-  const updateCartItemDetail = async (id, data) => { await updateDoc(doc(db, `users/${user.uid}/cart`, id), data); };
-  const updateCartCount = async (name, delta) => { const existing = cart.find(c => c.name === name); if (!existing) return; const newCount = existing.count + delta; if (newCount <= 0) await deleteDoc(doc(db, `users/${user.uid}/cart`, existing.id)); else await updateDoc(doc(db, `users/${user.uid}/cart`, existing.id), { count: newCount }); };
-  const removeItemsFromCart = async (names) => { const itemsToRemove = cart.filter(c => names.includes(c.name)); for (const item of itemsToRemove) await deleteDoc(doc(db, `users/${user.uid}/cart`, item.id)); };
-  const checkoutCartItems = async (selectedNames) => { const itemsToCheckout = cart.filter(item => selectedNames.includes(item.name)); const batch = writeBatch(db); itemsToCheckout.forEach(item => { let dbEntry = SHELF_LIFE_DB[item.name] || SHELF_LIFE_DB[item.name.toLowerCase()] || SHELF_LIFE_DB['default']; if (!dbEntry) dbEntry = { fridge: 7, price: 3000 }; let shelfLife = dbEntry.fridge || 7; let storage = 'fridge'; if (!dbEntry.fridge && dbEntry.freezer) storage = 'freezer'; const expiry = new Date(); expiry.setDate(expiry.getDate() + shelfLife); for(let i=0; i<item.count; i++) { const newRef = doc(collection(db, `users/${user.uid}/ingredients`)); batch.set(newRef, { name: item.name, category: storage, expiry: expiry, addedDate: new Date(), price: item.price !== undefined ? Number(item.price) : (dbEntry.price || 0), amount: item.amount !== undefined ? Number(item.amount) : 0, unit: item.unit || 'g' }); } const cartRef = doc(db, `users/${user.uid}/cart`, item.id); batch.delete(cartRef); }); await batch.commit(); toast.success("냉장고로 이동 완료!"); setActiveTab('list'); };
-  const getRiskLevel = (expiryDate, itemName = '') => { if (!expiryDate) return 'safe'; const today = new Date(); today.setHours(0,0,0,0); const expiry = new Date(expiryDate); expiry.setHours(0,0,0,0); const diffDays = Math.ceil((expiry - today) / (1000 * 60 * 60 * 24)); const settings = SHELF_LIFE_DB[itemName] || SHELF_LIFE_DB[itemName.replace(/\s+/g, '')] || SHELF_LIFE_DB['default'] || { risk: { danger: 3, warning: 7 } }; const { danger, warning } = settings.risk || { danger: 3, warning: 7 }; if (diffDays < 0) return 'expired'; if (diffDays <= danger) return 'danger'; if (diffDays <= warning) return 'warning'; return 'safe'; };
-  const addToCart = async (input) => { let name, amount = 0, unit = 'g'; if (typeof input === 'string') { name = input; } else { name = input.name; amount = input.amount || 0; unit = input.unit || 'g'; } const existing = cart.find(c => c.name === name); if (existing) { await updateDoc(doc(db, `users/${user.uid}/cart`, existing.id), { count: existing.count + 1, amount: amount > 0 ? amount : existing.amount, unit: unit !== 'g' ? unit : existing.unit }); } else { await addDoc(collection(db, `users/${user.uid}/cart`), { name, count: 1, amount, unit }); } toast.success(`${name} 담기 완료! 🛒`); };
+  // 3. 기능 함수들
+  const addItem = async (item) => {
+    try { 
+      await addDoc(collection(db, `users/${user.uid}/ingredients`), { ...item, addedDate: new Date(), expiry: item.expiry, price: Number(item.price) || 0 }); 
+      toast.success(`${item.name} 냉장고에 쏙! 🥬`, { icon: '✅' });
+      setActiveTab('list'); 
+    } catch (e) { toast.error("오류: " + e.message); }
+  };
+
+  const moveToTrash = async (ids) => {
+    const batch = writeBatch(db);
+    ids.forEach(id => {
+      const item = ingredients.find(i => i.id === id);
+      if (item) {
+        const { id: itemId, ...itemData } = item;
+        const trashRef = doc(collection(db, `users/${user.uid}/trash`));
+        batch.set(trashRef, { ...itemData, deletedAt: new Date() });
+        const historyRef = doc(collection(db, `users/${user.uid}/history`));
+        batch.set(historyRef, { name: item.name, action: 'wasted', price: Number(item.price) || 0, date: new Date() });
+        const ingRef = doc(db, `users/${user.uid}/ingredients`, id);
+        batch.delete(ingRef);
+      }
+    });
+    await batch.commit();
+  };
+
+  const consumeItem = async (ids) => {
+      const batch = writeBatch(db);
+      ids.forEach(id => {
+          const item = ingredients.find(i => i.id === id);
+          if (item) {
+              const historyRef = doc(collection(db, `users/${user.uid}/history`));
+              batch.set(historyRef, { name: item.name, action: 'used', price: Number(item.price) || 0, date: new Date() });
+              const ingRef = doc(db, `users/${user.uid}/ingredients`, id);
+              batch.delete(ingRef);
+          }
+      });
+      await batch.commit();
+  }
+
+  const resetHistory = async () => {
+    if (!confirm("정말 통계 기록을 초기화하시겠습니까?")) return;
+    try {
+      const q = query(collection(db, `users/${user.uid}/history`));
+      const snapshot = await getDocs(q);
+      if (snapshot.empty) { toast("기록이 없습니다."); return; }
+      const batch = writeBatch(db);
+      snapshot.docs.forEach((doc) => batch.delete(doc.ref));
+      await batch.commit();
+      toast.success("통계 초기화 완료!");
+    } catch (e) { toast.error("초기화 실패"); }
+  };
+
+  const resetFridge = async () => {
+    if (!confirm("정말 냉장고를 초기화하시겠습니까?")) return;
+    try {
+      const q = query(collection(db, `users/${user.uid}/ingredients`));
+      const snapshot = await getDocs(q);
+      const batch = writeBatch(db);
+      snapshot.docs.forEach((doc) => batch.delete(doc.ref));
+      await batch.commit();
+      toast.success("냉장고 초기화 완료!");
+    } catch (e) { toast.error("초기화 실패"); }
+  };
+
+  const restoreFromTrash = async (item) => {
+    const batch = writeBatch(db);
+    const ingRef = doc(collection(db, `users/${user.uid}/ingredients`));
+    const { id, deletedAt, ...rest } = item;
+    batch.set(ingRef, { ...rest });
+    const trashRef = doc(db, `users/${user.uid}/trash`, item.id);
+    batch.delete(trashRef);
+    await batch.commit();
+    toast.success("복구되었습니다!");
+  };
+
+  const permanentDelete = async (id) => {
+    await deleteDoc(doc(db, `users/${user.uid}/trash`, id));
+    toast.success("영구 삭제됨");
+  };
+
+  const updateIngredient = async (id, data) => {
+    try { await updateDoc(doc(db, `users/${user.uid}/ingredients`, id), data); } catch (e) { toast.error("수정 실패"); }
+  };
+
+  const updateCartItemDetail = async (id, data) => {
+    await updateDoc(doc(db, `users/${user.uid}/cart`, id), data);
+  };
+
+  const updateCartCount = async (name, delta) => { 
+    const existing = cart.find(c => c.name === name);
+    if (!existing) return;
+    const newCount = existing.count + delta;
+    if (newCount <= 0) await deleteDoc(doc(db, `users/${user.uid}/cart`, existing.id));
+    else await updateDoc(doc(db, `users/${user.uid}/cart`, existing.id), { count: newCount });
+  };
+
+  const removeItemsFromCart = async (names) => { 
+    const itemsToRemove = cart.filter(c => names.includes(c.name));
+    for (const item of itemsToRemove) await deleteDoc(doc(db, `users/${user.uid}/cart`, item.id));
+  };
+
+  const addToCart = async (input) => {
+    let name, amount = 0, unit = 'g';
+    if (typeof input === 'string') { name = input; } 
+    else { name = input.name; amount = input.amount || 0; unit = input.unit || 'g'; }
+    
+    const existing = cart.find(c => c.name === name);
+    if (existing) {
+       await updateDoc(doc(db, `users/${user.uid}/cart`, existing.id), { count: existing.count + 1, amount: amount > 0 ? amount : existing.amount, unit: unit !== 'g' ? unit : existing.unit });
+    } else {
+       await addDoc(collection(db, `users/${user.uid}/cart`), { name, count: 1, amount, unit });
+    }
+    toast.success(`${name} 담기 완료! 🛒`);
+  };
+
+  const checkoutCartItems = async (selectedNames) => { 
+    const itemsToCheckout = cart.filter(item => selectedNames.includes(item.name));
+    const batch = writeBatch(db);
+
+    itemsToCheckout.forEach(item => {
+      let dbEntry = SHELF_LIFE_DB[item.name] || SHELF_LIFE_DB[item.name.toLowerCase()] || SHELF_LIFE_DB['default'];
+      if (!dbEntry) dbEntry = { fridge: 7, price: 3000 }; 
+
+      let shelfLife = dbEntry.fridge || 7;
+      let storage = 'fridge';
+      if (!dbEntry.fridge && dbEntry.freezer) storage = 'freezer';
+      
+      const expiry = new Date();
+      expiry.setDate(expiry.getDate() + shelfLife);
+
+      for(let i=0; i<item.count; i++) {
+        const newRef = doc(collection(db, `users/${user.uid}/ingredients`));
+        batch.set(newRef, {
+          name: item.name, 
+          category: storage, 
+          expiry: expiry, 
+          addedDate: new Date(),
+          price: item.price !== undefined ? Number(item.price) : (dbEntry.price || 0),
+          amount: item.amount !== undefined ? Number(item.amount) : 0,
+          unit: item.unit || 'g'
+        });
+      }
+      const cartRef = doc(db, `users/${user.uid}/cart`, item.id);
+      batch.delete(cartRef);
+    });
+    
+    await batch.commit();
+    toast.success("냉장고로 이동 완료!");
+    setActiveTab('list');
+  };
+
+  const getRiskLevel = (expiryDate, itemName = '') => {
+    if (!expiryDate) return 'safe';
+    const today = new Date();
+    today.setHours(0,0,0,0);
+    const expiry = new Date(expiryDate);
+    expiry.setHours(0,0,0,0);
+    
+    const diffDays = Math.ceil((expiry - today) / (1000 * 60 * 60 * 24));
+    const settings = SHELF_LIFE_DB[itemName] || SHELF_LIFE_DB[itemName.replace(/\s+/g, '')] || SHELF_LIFE_DB['default'] || { risk: { danger: 3, warning: 7 } };
+    const { danger, warning } = settings.risk || { danger: 3, warning: 7 };
+
+    if (diffDays < 0) return 'expired';
+    if (diffDays <= danger) return 'danger'; 
+    if (diffDays <= warning) return 'warning'; 
+    return 'safe';
+  };
 
   return (
-    // 다크모드 최상위 래퍼: 배경색을 여기서 지정해야 전체 화면이 안 깨짐
-    <div className={isDarkMode ? "dark" : ""}>
-      <div className="min-h-screen font-sans flex justify-center transition-colors duration-300 bg-gray-100 dark:bg-gray-900 text-gray-800 dark:text-gray-100">
-        <Toaster position="top-center" toastOptions={{ style: { borderRadius: '20px', background: isDarkMode ? '#333' : '#222', color: '#fff' } }} />
+    <div className="min-h-screen bg-gray-100 font-sans flex justify-center text-gray-800">
+      <Toaster position="top-center" toastOptions={{ style: { borderRadius: '20px', background: '#222', color: '#fff', fontSize: '14px' } }} />
 
-        {/* 메인 레이아웃: PC에서는 3열 (사이드바 / 메인 / 대시보드) */}
-        <div className="w-full max-w-7xl md:flex md:p-8 h-screen md:h-auto">
-          
-          {/* 1. PC용 사이드바 (md 이상에서만 보임) */}
-          <DesktopSidebar 
+      <div className="w-full md:max-w-6xl md:grid md:grid-cols-[400px_1fr] md:gap-8 md:p-8 h-screen md:h-auto">
+        
+        {/* 1. PC용 사이드바 */}
+        <DesktopSidebar 
             activeTab={activeTab} 
             setActiveTab={setActiveTab} 
             cartCount={cart.reduce((s, i) => s + i.count, 0)}
-            isDarkMode={isDarkMode}
-            setIsDarkMode={setIsDarkMode}
             onReset={resetFridge}
             onLogout={() => signOut(auth)}
             onAddRequest={(d) => { setSelectedDateForAdd(d); setActiveTab('add'); }}
-          />
+            onNotiRequest={requestNotificationPermission} // 알림 버튼 연결
+        />
 
-          {/* 2. 메인 앱 화면 (모바일 뷰 & PC 메인 컨텐츠) */}
-          <div className="bg-white dark:bg-gray-800 md:rounded-[30px] shadow-2xl flex flex-col h-full md:h-[85vh] overflow-hidden border-x md:border dark:border-gray-700 relative w-full md:max-w-md mx-auto md:mx-0 transition-colors">
-            {/* 모바일용 헤더 (PC에서는 숨기거나 심플하게) */}
-            <header className="md:hidden bg-green-600 text-white p-5 pt-6 shadow-md z-10 flex justify-between items-center">
-              <div><h1 className="text-xl font-bold flex items-center gap-2"><Refrigerator /> Fresh Calendar</h1></div>
-              <div className="flex gap-2">
-                 <button onClick={() => setIsDarkMode(!isDarkMode)} className="p-2 bg-green-700 rounded-full">{isDarkMode ? <Sun size={18} /> : <Moon size={18} />}</button>
-                 <button onClick={() => signOut(auth)} className="p-2 bg-green-700 rounded-full"><LogOut size={18} /></button>
-              </div>
-            </header>
-
-            <main className="flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-900 relative scroll-smooth transition-colors">
-              {activeTab === 'calendar' && <CalendarView ingredients={ingredients} getRiskLevel={getRiskLevel} onDateSelect={(d) => setSelectedDateForAdd(d)} onAddRequest={(d) => { setSelectedDateForAdd(d); setActiveTab('add'); }} />}
-              {activeTab === 'list' && <FridgeListView ingredients={ingredients} getRiskLevel={getRiskLevel} moveToTrash={moveToTrash} consumeItem={consumeItem} updateIngredient={updateIngredient} onOpenTrash={() => setActiveTab('list')} />} {/* 휴지통 뷰는 별도 탭 처리 안하고 리스트 뷰 안에서 처리하거나 로직 수정 필요할 수 있음. 여기서는 단순화 */}
-              {activeTab === 'trash' && <TrashView trashItems={trashItems} onRestore={restoreFromTrash} onPermanentDelete={permanentDelete} onClose={() => setActiveTab('list')} />}
-              {activeTab === 'recipes' && <RecipeView ingredients={ingredients} onAddToCart={addToCart} recipes={RECIPE_FULL_DB} user={user} />} 
-              {activeTab === 'cart' && <ShoppingCartView cart={cart} ingredients={ingredients} onUpdateCount={updateCartCount} onRemove={removeItemsFromCart} onCheckout={checkoutCartItems} onUpdateDetail={updateCartItemDetail} onAdd={addToCart} />}
-              {activeTab === 'stats' && <InsightsView ingredients={ingredients} onAddToCart={addToCart} history={historyItems} onResetHistory={resetHistory} />}
-              {activeTab === 'add' && <AddItemModal onClose={() => setActiveTab('calendar')} onAdd={addItem} initialDate={selectedDateForAdd} />}
-            </main>
-
-            {/* 모바일용 하단 내비게이션 (PC에서는 숨김) */}
-            <nav className="bg-white dark:bg-gray-800 border-t dark:border-gray-700 flex justify-between px-6 py-3 pb-6 shadow-[0_-5px_15px_rgba(0,0,0,0.05)] md:hidden transition-colors">
-              <NavBtn active={activeTab==='calendar'} onClick={()=>setActiveTab('calendar')} icon={<Calendar />} label="달력" />
-              <NavBtn active={activeTab==='list'} onClick={()=>setActiveTab('list')} icon={<Refrigerator />} label="냉장고" />
-              <NavBtn active={activeTab==='cart'} onClick={()=>setActiveTab('cart')} icon={<ShoppingCart />} label="카트" count={cart.reduce((sum, item) => sum + item.count, 0)} />
-              <NavBtn active={activeTab==='recipes'} onClick={()=>setActiveTab('recipes')} icon={<ChefHat />} label="레시피" />
-              <NavBtn active={activeTab==='stats'} onClick={()=>setActiveTab('stats')} icon={<BarChart2 />} label="통계" />
-            </nav>
-          </div>
-
-          {/* 3. 오른쪽 대시보드 위젯 (PC에서만 보임 - 기존 코드 유지하되 스타일 보강) */}
-          <div className="hidden md:flex flex-col gap-6 h-[85vh] flex-1 ml-6">
-            <div className="bg-white dark:bg-gray-800 rounded-[30px] shadow-xl p-8 flex-1 overflow-y-auto transition-colors border dark:border-gray-700">
-              <h2 className="text-2xl font-bold mb-6 text-gray-800 dark:text-gray-100 flex items-center gap-2"><TrendingUp className="text-green-600" /> 나의 키친 대시보드</h2>
-              <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 h-full">
-                 <div className="bg-gray-50 dark:bg-gray-700 rounded-3xl p-2 shadow-inner"><InsightsView ingredients={ingredients} onAddToCart={addToCart} history={historyItems} onResetHistory={resetHistory} /></div>
-                 <div className="flex flex-col gap-4">
-                     <div className="bg-green-50 dark:bg-green-900/20 rounded-3xl p-6 border border-green-100 dark:border-green-800 flex-1">
-                        <h3 className="font-bold text-green-800 dark:text-green-400 mb-4 flex items-center gap-2"><ChefHat size={20}/> 추천 메뉴 바로가기</h3>
-                        <p className="text-sm text-green-700 dark:text-green-300 mb-4">유통기한 임박 재료로 만들 수 있는 요리를 확인하세요.</p>
-                        <button onClick={() => setActiveTab('recipes')} className="w-full bg-green-600 text-white py-3 rounded-xl font-bold hover:bg-green-700 transition-colors">레시피 보러가기</button>
-                     </div>
-                     <div className="bg-blue-50 dark:bg-blue-900/20 rounded-3xl p-6 border border-blue-100 dark:border-blue-800 flex-1">
-                        <h3 className="font-bold text-blue-800 dark:text-blue-400 mb-2 flex items-center gap-2"><ShoppingCart size={20}/> 장바구니 상태</h3>
-                        <div className="text-3xl font-bold text-blue-600 dark:text-blue-300 mb-1">{cart.length}개</div>
-                        <p className="text-xs text-blue-400">구매 예정 품목</p>
-                     </div>
-                 </div>
-              </div>
+        {/* 2. 메인 앱 화면 (모바일 뷰 & PC 메인 컨텐츠) */}
+        <div className="bg-white md:rounded-[30px] shadow-2xl flex flex-col h-full md:h-[85vh] overflow-hidden border-x md:border-0 relative max-w-md mx-auto md:mx-0 w-full">
+          <header className="md:hidden bg-green-600 text-white p-5 pt-6 shadow-md z-10 flex justify-between items-center">
+            <div><h1 className="text-xl font-bold flex items-center gap-2"><Refrigerator /> Fresh Calendar</h1><p className="text-green-100 text-xs mt-1 opacity-80">{user.email}</p></div>
+            <div className="flex gap-2">
+               <button onClick={requestNotificationPermission} className="p-2 bg-green-700 rounded-full hover:bg-green-800 transition-colors"><Bell size={18} /></button>
+               <button onClick={resetFridge} className="p-2 bg-green-700 rounded-full hover:bg-red-600 transition-colors" title="초기화"><RefreshCcw size={18} /></button>
+               <button onClick={() => signOut(auth)} className="p-2 bg-green-700 rounded-full hover:bg-green-800 transition-colors"><LogOut size={18} /></button>
             </div>
-          </div>
+          </header>
 
+          <main className="flex-1 overflow-y-auto bg-gray-50 relative scroll-smooth">
+            {activeTab === 'calendar' && <CalendarView ingredients={ingredients} getRiskLevel={getRiskLevel} onDateSelect={(d) => setSelectedDateForAdd(d)} onAddRequest={(d) => { setSelectedDateForAdd(d); setActiveTab('add'); }} />}
+            {activeTab === 'list' && <FridgeListView ingredients={ingredients} getRiskLevel={getRiskLevel} moveToTrash={moveToTrash} consumeItem={consumeItem} updateIngredient={updateIngredient} onOpenTrash={() => setActiveTab('trash')} />}
+            {activeTab === 'trash' && <TrashView trashItems={trashItems} onRestore={restoreFromTrash} onPermanentDelete={permanentDelete} onClose={() => setActiveTab('list')} />}
+            {activeTab === 'recipes' && <RecipeView ingredients={ingredients} onAddToCart={addToCart} recipes={RECIPE_FULL_DB} user={user} />} 
+            {activeTab === 'cart' && <ShoppingCartView cart={cart} ingredients={ingredients} onUpdateCount={updateCartCount} onRemove={removeItemsFromCart} onCheckout={checkoutCartItems} onUpdateDetail={updateCartItemDetail} onAdd={addToCart} />}
+            {activeTab === 'stats' && <InsightsView ingredients={ingredients} onAddToCart={addToCart} history={historyItems} onResetHistory={resetHistory} />}
+            {activeTab === 'add' && <AddItemModal onClose={() => setActiveTab('calendar')} onAdd={addItem} initialDate={selectedDateForAdd} />}
+          </main>
+
+          <nav className="bg-white border-t flex justify-between px-6 py-3 pb-6 shadow-[0_-5px_15px_rgba(0,0,0,0.05)] md:hidden">
+            <NavBtn active={activeTab==='calendar'} onClick={()=>setActiveTab('calendar')} icon={<Calendar />} label="달력" />
+            <NavBtn active={activeTab==='list'} onClick={()=>setActiveTab('list')} icon={<Refrigerator />} label="냉장고" />
+            <NavBtn active={activeTab==='cart'} onClick={()=>setActiveTab('cart')} icon={<ShoppingCart />} label="카트" count={cart.reduce((sum, item) => sum + item.count, 0)} />
+            <NavBtn active={activeTab==='recipes'} onClick={()=>setActiveTab('recipes')} icon={<ChefHat />} label="레시피" />
+            <NavBtn active={activeTab==='stats'} onClick={()=>setActiveTab('stats')} icon={<BarChart2 />} label="통계" />
+          </nav>
         </div>
+
+        {/* 3. 오른쪽: PC 전용 대시보드 (통계 컴포넌트 재사용) */}
+        <div className="hidden md:flex flex-col gap-6 h-[85vh] flex-1">
+           <div className="bg-white rounded-[30px] shadow-xl p-8 flex-1 overflow-y-auto">
+              <h2 className="text-2xl font-bold mb-6 text-gray-800 flex items-center gap-2"><TrendingUp className="text-green-600" /> 나의 키친 대시보드</h2>
+              
+              {/* 대시보드 내용은 InsightsView를 그대로 사용하여 가로 배치를 적용 */}
+              <InsightsView ingredients={ingredients} onAddToCart={addToCart} history={historyItems} onResetHistory={resetHistory} />
+              
+              {/* 하단 추가 배너 */}
+              <div className="mt-6 p-6 bg-green-50 border border-green-100 rounded-3xl flex items-center justify-between">
+                 <div>
+                    <h3 className="font-bold text-green-800 mb-1 flex items-center gap-2"><ChefHat size={20}/> 추천 메뉴 바로가기</h3>
+                    <p className="text-sm text-green-600">유통기한 임박 재료로 만들 수 있는 요리를 확인하세요.</p>
+                 </div>
+                 <button onClick={() => setActiveTab('recipes')} className="bg-green-600 text-white px-6 py-3 rounded-xl font-bold hover:bg-green-700 transition-colors shadow-md">
+                    레시피 보러가기
+                 </button>
+              </div>
+           </div>
+        </div>
+
       </div>
     </div>
   );
@@ -2056,59 +2281,57 @@ function InsightsView({ ingredients, onAddToCart, history, onResetHistory }) {
   return (
     <div className="p-4 pb-20 animate-in fade-in duration-500">
       <div className="flex justify-between items-center mb-4">
-        <h2 className="text-lg font-bold flex items-center gap-2 dark:text-white">
+        <h2 className="text-lg font-bold flex items-center gap-2 text-gray-800">
           <BarChart2 className="text-green-600" /> 통계 및 분석
         </h2>
-        <button onClick={onResetHistory} className="text-xs bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-300 px-3 py-1.5 rounded-lg flex items-center gap-1 hover:bg-red-50 hover:text-red-600 transition-colors">
+        <button onClick={onResetHistory} className="text-xs bg-gray-100 text-gray-500 px-3 py-1.5 rounded-lg flex items-center gap-1 hover:bg-red-50 hover:text-red-600 transition-colors">
           <RefreshCcw size={12} /> 기록 초기화
         </button>
       </div>
       
-      <div className={`p-6 rounded-3xl shadow-lg mb-6 text-white relative overflow-hidden transition-colors ${netSavings >= 0 ? 'bg-gradient-to-br from-green-500 to-green-700' : 'bg-gradient-to-br from-red-500 to-red-700'}`}>
-        <div className="absolute top-0 right-0 p-8 opacity-10"><DollarSign size={100} /></div>
-        <div className="relative z-10">
-          <h3 className="font-medium text-green-100 mb-1 flex items-center gap-2">이번 달 집밥 순수 절약액</h3>
-          <div className="text-4xl font-bold mb-4 flex items-baseline gap-1">
-            {formatMoney(netSavings)}<span className="text-lg font-normal">원</span>
-          </div>
-          
-          <div className="bg-white/20 rounded-xl p-3 backdrop-blur-sm text-sm space-y-2">
-             <div className="flex justify-between items-center">
-               <div className="text-green-100 text-xs flex items-center gap-1"><Utensils size={12}/> 식재료 사용 가치 (절약분 60%)</div>
-               <div className="font-bold">+{formatMoney(rawSavings)}원</div>
-             </div>
-             <div className="flex justify-between items-center text-red-100">
-               <div className="text-xs flex items-center gap-1"><Trash2 size={12}/> 폐기된 식재료 손실</div>
-               <div className="font-bold">-{formatMoney(totalWasted)}원</div>
-             </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="bg-white dark:bg-gray-800 p-5 rounded-2xl border dark:border-gray-700 shadow-sm mb-4">
-        <h3 className="text-sm font-bold text-gray-500 dark:text-gray-400 mb-3 flex items-center gap-1"><PieChart size={14} /> 현재 냉장고 상태</h3>
-        <div className="flex items-center justify-between">
-            <div className="text-center"><div className="text-2xl font-bold text-green-600">{ingredients.length}</div><div className="text-xs text-gray-400">보관 중</div></div>
-            <div className="h-8 w-[1px] bg-gray-200 dark:bg-gray-600"></div>
-            <div className="text-center"><div className="text-2xl font-bold text-blue-500">{history.filter(h=>h.action==='used').length}</div><div className="text-xs text-gray-400">누적 소비</div></div>
-            <div className="h-8 w-[1px] bg-gray-200 dark:bg-gray-600"></div>
-            <div className="text-center"><div className="text-2xl font-bold text-red-500">{history.filter(h=>h.action==='wasted').length}</div><div className="text-xs text-gray-400">누적 폐기</div></div>
-        </div>
-      </div>
-
-      <div className="bg-white dark:bg-gray-800 p-5 rounded-2xl border dark:border-gray-700 shadow-sm mb-4">
-        <h3 className="text-sm font-bold text-gray-500 dark:text-gray-400 mb-4 flex items-center gap-1"><TrendingUp size={14} /> 자주 먹은 식재료 Top 5</h3>
-        <div className="space-y-4">
-          {rankedItems.length > 0 ? rankedItems.map(([name, count], idx) => (
-            <div key={idx} className="group">
-              <div className="flex justify-between items-center text-xs mb-1">
-                <span className="font-bold text-gray-700 dark:text-gray-200">{name}</span>
-                <div className="flex items-center gap-2"><span className="text-gray-400">{count}회 사용</span><button onClick={() => { onAddToCart(name);}} className="bg-green-50 dark:bg-gray-700 text-green-600 dark:text-green-400 p-1 rounded hover:bg-green-100 transition-colors" title="장바구니에 담기"><Plus size={12} /></button></div>
+      {/* 🟢 [수정됨] PC에서는 가로(grid), 모바일은 세로(col) 배치 */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      
+          {/* 카드 1: 절약 금액 */}
+          <div className={`p-6 rounded-3xl shadow-lg text-white relative overflow-hidden transition-colors ${netSavings >= 0 ? 'bg-gradient-to-br from-green-500 to-green-700' : 'bg-gradient-to-br from-red-500 to-red-700'}`}>
+            <div className="absolute top-0 right-0 p-8 opacity-10"><DollarSign size={100} /></div>
+            <div className="relative z-10">
+              <h3 className="font-medium text-green-100 mb-1 flex items-center gap-2">이번 달 순수 절약</h3>
+              <div className="text-3xl font-bold mb-4 flex items-baseline gap-1">
+                {formatMoney(netSavings)}<span className="text-sm font-normal">원</span>
               </div>
-              <div className="w-full bg-gray-100 dark:bg-gray-700 rounded-full h-2"><div className="bg-green-500 h-2 rounded-full transition-all duration-1000" style={{ width: `${(count / maxCount) * 100}%` }}></div></div>
+              <div className="bg-white/20 rounded-xl p-3 backdrop-blur-sm text-sm space-y-2">
+                 <div className="flex justify-between"><span>+사용</span><span>{formatMoney(rawSavings)}</span></div>
+                 <div className="flex justify-between text-red-100"><span>-폐기</span><span>{formatMoney(totalWasted)}</span></div>
+              </div>
             </div>
-          )) : <div className="text-center text-gray-400 text-xs py-4">아직 사용 기록이 없습니다.<br/>냉장고에서 '사용' 버튼을 눌러보세요.</div>}
-        </div>
+          </div>
+
+          {/* 카드 2: 현재 상태 */}
+          <div className="bg-white p-5 rounded-2xl border shadow-sm flex flex-col justify-center">
+            <h3 className="text-sm font-bold text-gray-500 mb-3 flex items-center gap-1"><PieChart size={14} /> 냉장고 현황</h3>
+            <div className="flex items-center justify-between px-2">
+                <div className="text-center"><div className="text-2xl font-bold text-green-600">{ingredients.length}</div><div className="text-xs text-gray-400">보관</div></div>
+                <div className="h-8 w-[1px] bg-gray-200"></div>
+                <div className="text-center"><div className="text-2xl font-bold text-blue-500">{history.filter(h=>h.action==='used').length}</div><div className="text-xs text-gray-400">소비</div></div>
+                <div className="h-8 w-[1px] bg-gray-200"></div>
+                <div className="text-center"><div className="text-2xl font-bold text-red-500">{history.filter(h=>h.action==='wasted').length}</div><div className="text-xs text-gray-400">폐기</div></div>
+            </div>
+          </div>
+
+          {/* 카드 3: 자주 먹은 재료 */}
+          <div className="bg-white p-5 rounded-2xl border shadow-sm">
+            <h3 className="text-sm font-bold text-gray-500 mb-4 flex items-center gap-1"><TrendingUp size={14} /> 자주 먹은 재료</h3>
+            <div className="space-y-3 max-h-40 overflow-y-auto pr-1">
+              {rankedItems.length > 0 ? rankedItems.map(([name, count], idx) => (
+                <div key={idx} className="flex justify-between items-center text-xs">
+                    <span className="font-bold text-gray-700">{idx+1}. {name}</span>
+                    <span className="text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">{count}회</span>
+                </div>
+              )) : <div className="text-center text-gray-400 text-xs py-4">기록 없음</div>}
+            </div>
+          </div>
+
       </div>
     </div>
   );
