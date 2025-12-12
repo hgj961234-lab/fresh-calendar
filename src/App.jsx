@@ -1002,7 +1002,7 @@ function AuthScreen() {
   );
 }
 
-// --- AppContent: 다크모드 수정 & 장바구니 로직 개선 ---
+// --- AppContent: 다크모드 해결 & 알림 기능 추가 ---
 function AppContent({ user }) {
   const [activeTab, setActiveTab] = useState('calendar');
   const [ingredients, setIngredients] = useState([]);
@@ -1011,10 +1011,10 @@ function AppContent({ user }) {
   const [historyItems, setHistoryItems] = useState([]);
   const [selectedDateForAdd, setSelectedDateForAdd] = useState(null);
   
-  // 🟢 [수정] 다크모드 초기값을 false로 설정
+  // 🟢 [수정] 다크모드 상태 (기본값 false)
   const [isDarkMode, setIsDarkMode] = useState(false);
 
-  // 1. 데이터 구독 (useEffect)
+  // 1. 데이터 구독 및 알림 체크
   useEffect(() => {
     const qIng = query(collection(db, `users/${user.uid}/ingredients`));
     const unsubIng = onSnapshot(qIng, (snap) => {
@@ -1023,7 +1023,8 @@ function AppContent({ user }) {
         return { ...data, id: d.id, expiry: data.expiry?.toDate() || new Date(), addedDate: data.addedDate?.toDate() || new Date() };
       });
       setIngredients(items);
-      checkNotifications(items); 
+      // 데이터 로드 시 알림 체크 (권한이 있을 때만)
+      checkExpiryAndNotify(items); 
     });
 
     const qCart = query(collection(db, `users/${user.uid}/cart`));
@@ -1044,9 +1045,50 @@ function AppContent({ user }) {
     return () => { unsubIng(); unsubCart(); unsubTrash(); unsubHistory(); };
   }, [user]);
 
-  // 2. 헬퍼 함수들
-  const checkNotifications = (items) => { if ("Notification" in window && Notification.permission === "granted") {} };
-  const requestNotiPermission = () => { if ("Notification" in window) Notification.requestPermission(); };
+  // 🟢 [New] 알림 권한 요청 함수
+  const requestNotificationPermission = () => {
+    if (!("Notification" in window)) {
+      toast.error("이 브라우저는 알림을 지원하지 않습니다.");
+      return;
+    }
+
+    Notification.requestPermission().then((permission) => {
+      if (permission === "granted") {
+        toast.success("알림이 설정되었습니다! 🔔");
+        checkExpiryAndNotify(ingredients); // 권한 허용 즉시 체크
+      } else {
+        toast.error("알림 권한이 거부되었습니다.");
+      }
+    });
+  };
+
+  // 🟢 [New] 유통기한 체크 및 알림 발송 로직
+  const checkExpiryAndNotify = (items) => {
+    if (Notification.permission !== "granted") return;
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    // 3일 이내 남은 재료 찾기
+    const urgentItems = items.filter(item => {
+      if (!item.expiry) return false;
+      const exp = new Date(item.expiry);
+      exp.setHours(0, 0, 0, 0);
+      const diffDays = Math.ceil((exp - today) / (1000 * 60 * 60 * 24));
+      return diffDays >= 0 && diffDays <= 3;
+    });
+
+    if (urgentItems.length > 0) {
+      // 너무 자주 울리지 않게 하기 위해 간단한 로직 (실제로는 LocalStorage 등에 마지막 알림 시간 저장 권장)
+      // 여기서는 예시로 첫 번째 항목만 보여줍니다.
+      new Notification("Fresh Calendar 🚨", {
+        body: `${urgentItems[0].name} 외 ${urgentItems.length - 1}개 재료의 유통기한이 임박했습니다!`,
+        icon: "/favicon.ico" // 아이콘 경로가 있다면 추가
+      });
+    }
+  };
+
+  // 기존 헬퍼 함수들 (그대로 유지)
   const addItem = async (item) => { try { await addDoc(collection(db, `users/${user.uid}/ingredients`), { ...item, addedDate: new Date(), expiry: item.expiry, price: Number(item.price) || 0 }); toast.success(`${item.name} 냉장고에 쏙! 🥬`, { icon: '✅' }); setActiveTab('list'); } catch (e) { toast.error("오류: " + e.message); } };
   const moveToTrash = async (ids) => { const batch = writeBatch(db); ids.forEach(id => { const item = ingredients.find(i => i.id === id); if (item) { const { id: itemId, ...itemData } = item; const trashRef = doc(collection(db, `users/${user.uid}/trash`)); batch.set(trashRef, { ...itemData, deletedAt: new Date() }); const historyRef = doc(collection(db, `users/${user.uid}/history`)); batch.set(historyRef, { name: item.name, action: 'wasted', price: Number(item.price) || 0, date: new Date() }); const ingRef = doc(db, `users/${user.uid}/ingredients`, id); batch.delete(ingRef); } }); await batch.commit(); };
   const consumeItem = async (ids) => { const batch = writeBatch(db); ids.forEach(id => { const item = ingredients.find(i => i.id === id); if (item) { const historyRef = doc(collection(db, `users/${user.uid}/history`)); batch.set(historyRef, { name: item.name, action: 'used', price: Number(item.price) || 0, date: new Date() }); const ingRef = doc(db, `users/${user.uid}/ingredients`, id); batch.delete(ingRef); } }); await batch.commit(); }
@@ -1061,36 +1103,21 @@ function AppContent({ user }) {
   const checkoutCartItems = async (selectedNames) => { const itemsToCheckout = cart.filter(item => selectedNames.includes(item.name)); const batch = writeBatch(db); itemsToCheckout.forEach(item => { let dbEntry = SHELF_LIFE_DB[item.name] || SHELF_LIFE_DB[item.name.toLowerCase()] || SHELF_LIFE_DB['default']; if (!dbEntry) dbEntry = { fridge: 7, price: 3000 }; let shelfLife = dbEntry.fridge || 7; let storage = 'fridge'; if (!dbEntry.fridge && dbEntry.freezer) storage = 'freezer'; const expiry = new Date(); expiry.setDate(expiry.getDate() + shelfLife); for(let i=0; i<item.count; i++) { const newRef = doc(collection(db, `users/${user.uid}/ingredients`)); batch.set(newRef, { name: item.name, category: storage, expiry: expiry, addedDate: new Date(), price: item.price !== undefined ? Number(item.price) : (dbEntry.price || 0), amount: item.amount !== undefined ? Number(item.amount) : 0, unit: item.unit || 'g' }); } const cartRef = doc(db, `users/${user.uid}/cart`, item.id); batch.delete(cartRef); }); await batch.commit(); toast.success("냉장고로 이동 완료!"); setActiveTab('list'); };
   const getRiskLevel = (expiryDate, itemName = '') => { if (!expiryDate) return 'safe'; const today = new Date(); today.setHours(0,0,0,0); const expiry = new Date(expiryDate); expiry.setHours(0,0,0,0); const diffDays = Math.ceil((expiry - today) / (1000 * 60 * 60 * 24)); const settings = SHELF_LIFE_DB[itemName] || SHELF_LIFE_DB[itemName.replace(/\s+/g, '')] || SHELF_LIFE_DB['default'] || { risk: { danger: 3, warning: 7 } }; const { danger, warning } = settings.risk || { danger: 3, warning: 7 }; if (diffDays < 0) return 'expired'; if (diffDays <= danger) return 'danger'; if (diffDays <= warning) return 'warning'; return 'safe'; };
 
-  // 🟢 [수정] addToCart 함수 개선 (이름 또는 객체 모두 처리 가능)
   const addToCart = async (input) => {
     let name, amount = 0, unit = 'g';
-
-    if (typeof input === 'string') {
-        name = input; // 기존 방식 (문자열만 올 때)
-    } else {
-        name = input.name; // 객체로 올 때 (이름, 양, 단위 포함)
-        amount = input.amount || 0;
-        unit = input.unit || 'g';
-    }
-
+    if (typeof input === 'string') { name = input; } 
+    else { name = input.name; amount = input.amount || 0; unit = input.unit || 'g'; }
     const existing = cart.find(c => c.name === name);
-    if (existing) {
-        // 이미 있으면 수량 증가 + 용량 업데이트(선택 사항)
-        await updateDoc(doc(db, `users/${user.uid}/cart`, existing.id), { 
-            count: existing.count + 1,
-            amount: amount > 0 ? amount : existing.amount, // 새로운 용량 정보가 있으면 업데이트
-            unit: unit !== 'g' ? unit : existing.unit 
-        });
-    } else {
-        await addDoc(collection(db, `users/${user.uid}/cart`), { name, count: 1, amount, unit });
-    }
+    if (existing) { await updateDoc(doc(db, `users/${user.uid}/cart`, existing.id), { count: existing.count + 1, amount: amount > 0 ? amount : existing.amount, unit: unit !== 'g' ? unit : existing.unit }); } 
+    else { await addDoc(collection(db, `users/${user.uid}/cart`), { name, count: 1, amount, unit }); }
     toast.success(`${name} 장바구니에 담았어요 🛒`);
   };
 
   return (
-    // 🟢 [수정] 다크모드 클래스 적용 방식 명확화
+    // 🟢 [핵심 수정] isDarkMode가 true일 때 최상위 div에 'dark' 클래스를 강제로 적용
+    // 그리고 배경색을 여기서 지정하여 전체 화면에 적용되도록 함
     <div className={isDarkMode ? "dark" : ""}>
-      <div className="min-h-screen bg-gray-100 dark:bg-gray-900 font-sans flex justify-center text-gray-800 dark:text-gray-100 transition-colors duration-300">
+      <div className={`min-h-screen font-sans flex justify-center transition-colors duration-300 ${isDarkMode ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-800'}`}>
         <Toaster position="top-center" toastOptions={{ style: { borderRadius: '20px', background: isDarkMode ? '#333' : '#222', color: '#fff', fontSize: '14px' } }} />
 
         <div className="w-full md:max-w-6xl md:grid md:grid-cols-[400px_1fr] md:gap-8 md:p-8 h-screen md:h-auto">
@@ -1099,8 +1126,12 @@ function AppContent({ user }) {
             <header className="bg-green-600 text-white p-5 pt-6 shadow-md z-10 flex justify-between items-center">
               <div><h1 className="text-xl font-bold flex items-center gap-2"><Refrigerator /> Fresh Calendar</h1><p className="text-green-100 text-xs mt-1 opacity-80">{user.email}</p></div>
               <div className="flex gap-2">
-                {/* 🟢 [수정] 토글 버튼 로직 확인 */}
-                <button onClick={() => setIsDarkMode(prev => !prev)} className="p-2 bg-green-700 rounded-full hover:bg-green-800 transition-colors">
+                {/* 🟢 [New] 알림 버튼 추가 */}
+                <button onClick={requestNotificationPermission} className="p-2 bg-green-700 rounded-full hover:bg-green-800 transition-colors" title="유통기한 알림 받기">
+                    <Bell size={18} />
+                </button>
+                {/* 다크모드 토글 */}
+                <button onClick={() => setIsDarkMode(!isDarkMode)} className="p-2 bg-green-700 rounded-full hover:bg-green-800 transition-colors">
                     {isDarkMode ? <Sun size={18} /> : <Moon size={18} />}
                 </button>
                 <button onClick={resetFridge} className="p-2 bg-green-700 rounded-full hover:bg-red-600 transition-colors" title="초기화"><RefreshCcw size={18} /></button>
@@ -1620,20 +1651,22 @@ function ShoppingCartView({ cart, ingredients, onUpdateCount, onRemove, onChecko
   );
 }
 
-// --- 레시피 뷰 (수정 완료: 인분 조절 UI, 용량 연동, 다크모드) ---
+// --- RecipeView: 생략 없음, 모든 기능 포함 ---
 function RecipeView({ ingredients, onAddToCart, recipes, user }) {
   const [activeTab, setActiveTab] = useState('default'); 
   const [myRecipes, setMyRecipes] = useState([]);
+  
+  // 리스트 필터링용 상태
   const [selectedIngredients, setSelectedIngredients] = useState([]);
   const [selectedRecipe, setSelectedRecipe] = useState(null);
   
-  // 상세화면 상태
+  // 상세화면용 상태
   const [ingredientsToBuy, setIngredientsToBuy] = useState([]);
   const [servings, setServings] = useState(1); 
   const [isCookingMode, setIsCookingMode] = useState(false);
   const [currentStep, setCurrentStep] = useState(0);
 
-  // 내 레시피 불러오기
+  // 1. 내 레시피 불러오기 (Firebase)
   useEffect(() => {
     if(!user) return;
     const q = query(collection(db, `users/${user.uid}/recipes`));
@@ -1643,7 +1676,7 @@ function RecipeView({ ingredients, onAddToCart, recipes, user }) {
     return () => unsub();
   }, [user]);
 
-  // 레시피 열 때 없는 재료 자동 선택
+  // 2. 레시피 열 때 '없는 재료' 자동 선택
   useEffect(() => {
     if (selectedRecipe) {
         const missing = selectedRecipe.ingredients.filter(ing => 
@@ -1653,35 +1686,36 @@ function RecipeView({ ingredients, onAddToCart, recipes, user }) {
     }
   }, [selectedRecipe, ingredients]);
 
-  // 재료명 매칭 헬퍼
+  // 3. 재료명 매칭 헬퍼 (공백 제거 후 비교)
   const matchIngredient = (r, u) => { 
-      const rr=r.replace(/\s/g,''), uu=u.replace(/\s/g,''); 
-      if(rr===uu) return true; 
-      return rr.includes(uu)||uu.includes(rr); 
+      const rr = r.replace(/\s/g,'');
+      const uu = u.replace(/\s/g,''); 
+      if(rr === uu) return true; 
+      return rr.includes(uu) || uu.includes(rr); 
   };
 
-  // 재료 칩 선택 토글
+  // 4. 재료 칩 선택 토글 함수
   const toggleIngredientToBuy = (ingName) => {
-      if (ingredientsToBuy.includes(ingName)) setIngredientsToBuy(prev => prev.filter(i => i !== ingName));
-      else setIngredientsToBuy(prev => [...prev, ingName]);
+      if (ingredientsToBuy.includes(ingName)) {
+          setIngredientsToBuy(prev => prev.filter(i => i !== ingName));
+      } else {
+          setIngredientsToBuy(prev => [...prev, ingName]);
+      }
   };
 
-  // 🟢 [핵심 수정] 텍스트에서 용량(숫자)과 단위 추출
+  // 5. 텍스트에서 용량(숫자)과 단위 추출 (정규식)
   const extractAmountAndUnit = (ingName, measureText) => {
       if (!measureText) return { amount: 0, unit: 'g' };
       
-      // 정규식: 재료명 근처에 있는 숫자와 단위(g, kg, ml, L, 개, 봉, T, 컵 등)를 찾음
-      // 예: "돼지고기 300g" -> 300, g 추출
       try {
+        // 재료명 근처의 숫자와 단위를 찾음
         const regex = new RegExp(`${ingName}.*?([0-9.]+)\\s*(g|kg|ml|L|개|봉|t|T|컵|쪽|마리)`, 'i');
         const match = measureText.match(regex);
         
         if (match) {
             let amount = parseFloat(match[1]);
-            // 현재 설정된 인분 수(servings)에 맞춰 곱하기
+            // 인분 수에 맞춰 곱하기
             amount = amount * servings;
-            
-            // 소수점 정리 (정수면 그대로, 소수면 1자리까지)
             return { 
                 amount: Number.isInteger(amount) ? amount : Number(amount.toFixed(1)), 
                 unit: match[2] 
@@ -1693,7 +1727,7 @@ function RecipeView({ ingredients, onAddToCart, recipes, user }) {
       return { amount: 0, unit: 'g' };
   };
 
-  // 🟢 [핵심 수정] 선택한 재료 장바구니 담기 (용량 포함)
+  // 6. 선택한 재료 장바구니 담기
   const handleAddSelectedToCart = () => {
       if(ingredientsToBuy.length === 0) {
           toast.error('담을 재료를 선택해주세요!');
@@ -1702,27 +1736,25 @@ function RecipeView({ ingredients, onAddToCart, recipes, user }) {
       
       let addedCount = 0;
       ingredientsToBuy.forEach(item => {
-          // measure 텍스트에서 용량 정보 추출
           const { amount, unit } = extractAmountAndUnit(item, selectedRecipe.measure);
-          
-          // AppContent의 addToCart로 객체 전달
           onAddToCart({ name: item, amount, unit });
           addedCount++;
       });
       toast.success(`${addedCount}개 재료를 장바구니에 담았습니다!`);
   };
 
-  // 텍스트 내 숫자 스케일링 (화면 표시용)
+  // 7. 인분 조절용 텍스트 변환
   const scaleText = (text, factor) => {
      if (factor === 1 || !text) return text;
+     // 텍스트 내의 모든 숫자를 찾아서 곱함
      return text.replace(/(\d+(\.\d+)?)/g, (match) => {
         const num = parseFloat(match);
-        // 날짜(2023...)나 순서(1.) 등은 제외하면 좋겠지만 간단하게 모든 숫자 변환
+        // 날짜 같은 큰 숫자는 제외하는 게 좋지만, 일단 단순 곱하기 적용
         return Number.isInteger(num * factor) ? (num * factor) : (num * factor).toFixed(1);
      });
   };
 
-  // 조리 모드 토글 (Wake Lock)
+  // 8. 조리 모드 토글 (화면 꺼짐 방지)
   const toggleCookingMode = async () => {
      if (!isCookingMode) {
         try {
@@ -1738,12 +1770,13 @@ function RecipeView({ ingredients, onAddToCart, recipes, user }) {
      }
   };
 
-  // 나만의 레시피 추가
+  // 9. 나만의 레시피 추가 (사용자 입력)
   const addMyRecipe = async () => {
     const name = prompt("🍳 레시피 이름이 무엇인가요?");
     if(!name) return;
     const ingreds = prompt("🥕 필요한 재료를 쉼표(,)로 구분해 적어주세요\n(예: 김치, 돼지고기, 두부)");
-    const steps = prompt("📝 조리법을 단계별로 적어주세요");
+    const steps = prompt("📝 조리법을 단계별로 적어주세요 (줄바꿈이 안되니 1. 2. 번호를 붙여주세요)");
+    
     try {
         await addDoc(collection(db, `users/${user.uid}/recipes`), {
             name, category: 'My',
@@ -1751,11 +1784,11 @@ function RecipeView({ ingredients, onAddToCart, recipes, user }) {
             measure: ingreds || '',
             steps: steps ? [steps] : ['자유롭게 조리하세요!']
         });
-        toast.success('레시피가 추가되었습니다!');
+        toast.success('나만의 레시피가 추가되었습니다!');
     } catch(e) { toast.error('저장 실패'); }
   };
 
-  // 유통기한 임박도 계산
+  // 10. 유통기한 임박도 계산 (정렬용)
   const getIngredientUrgency = (ingName) => {
     const matchedItems = ingredients.filter(i => matchIngredient(ingName, i.name));
     if (matchedItems.length === 0) return 0;
@@ -1768,9 +1801,9 @@ function RecipeView({ ingredients, onAddToCart, recipes, user }) {
     return hasDanger ? 5 : 1; 
   };
   
+  // 11. 레시피 정렬 로직 (보유 재료 + 임박 재료 우선)
   const allRecipes = activeTab === 'default' ? recipes : myRecipes;
   
-  // 레시피 정렬 로직
   const matchedRecipes = allRecipes.map(recipe => {
       const existing = recipe.ingredients.filter(req => selectedIngredients.some(sel => matchIngredient(req, sel)));
       const missing = recipe.ingredients.filter(req => !selectedIngredients.some(sel => matchIngredient(req, sel)));
@@ -1781,20 +1814,25 @@ function RecipeView({ ingredients, onAddToCart, recipes, user }) {
       return { ...recipe, existing, missing, score: existing.length + urgencyScore };
   }).sort((a, b) => b.score - a.score);
 
+  // 리스트 필터링용 토글 함수
   const toggleSelection = (name) => { if (selectedIngredients.includes(name)) setSelectedIngredients(selectedIngredients.filter(i => i !== name)); else setSelectedIngredients([...selectedIngredients, name]); };
   const toggleSelectAll = () => { if (selectedIngredients.length === ingredients.length && ingredients.length > 0) setSelectedIngredients([]); else setSelectedIngredients(ingredients.map(i => i.name)); };
 
 
-  // --- 1. 조리 모드 뷰 ---
+  // ------------------------------------------------
+  // [VIEW 1] 조리 모드 (전체 화면 슬라이드)
+  // ------------------------------------------------
   if (isCookingMode && selectedRecipe) {
      const scaledSteps = selectedRecipe.steps.map(s => scaleText(s, servings));
      return (
         <div className="fixed inset-0 z-50 bg-gray-900 text-white flex flex-col animate-in fade-in duration-300">
+           {/* 상단 컨트롤 바 */}
            <div className="flex justify-between items-center p-6 border-b border-gray-700">
               <h2 className="text-xl font-bold truncate pr-4">{selectedRecipe.name} (Step {currentStep + 1}/{scaledSteps.length})</h2>
               <button onClick={toggleCookingMode} className="bg-red-600 px-4 py-2 rounded-lg font-bold text-sm flex items-center gap-1 hover:bg-red-700"><X size={16}/> 종료</button>
            </div>
            
+           {/* 메인 텍스트 */}
            <div className="flex-1 flex items-center justify-center p-8 text-center">
               <div className="max-w-2xl">
                  <span className="inline-block bg-green-600 text-2xl font-bold rounded-full w-16 h-16 flex items-center justify-center mb-6 mx-auto shadow-lg shadow-green-900/50">{currentStep + 1}</span>
@@ -1802,6 +1840,7 @@ function RecipeView({ ingredients, onAddToCart, recipes, user }) {
               </div>
            </div>
 
+           {/* 하단 네비게이션 */}
            <div className="p-8 pb-10 flex justify-between items-center bg-gray-800">
               <button disabled={currentStep===0} onClick={()=>setCurrentStep(prev=>prev-1)} className="flex items-center gap-2 text-lg font-bold disabled:opacity-30 hover:text-green-400"><ChevronLeft size={30}/> 이전</button>
               <button disabled={currentStep===scaledSteps.length-1} onClick={()=>setCurrentStep(prev=>prev+1)} className="flex items-center gap-2 text-lg font-bold disabled:opacity-30 hover:text-green-400">다음 <ChevronRight size={30}/></button>
@@ -1810,12 +1849,14 @@ function RecipeView({ ingredients, onAddToCart, recipes, user }) {
      );
   }
 
-  // --- 2. 레시피 상세 화면 ---
+  // ------------------------------------------------
+  // [VIEW 2] 레시피 상세 화면 (스크롤 뷰)
+  // ------------------------------------------------
   if (selectedRecipe) {
       return (
         <div className="p-4 pb-24 h-full bg-white dark:bg-gray-900 flex flex-col overflow-y-auto transition-colors">
-            {/* 상단바 */}
-            <div className="sticky top-0 bg-white dark:bg-gray-900 z-10 pb-4 border-b dark:border-gray-700 mb-4">
+            {/* 상단 네비게이션 (플로팅 제거됨) */}
+            <div className="bg-white dark:bg-gray-900 pb-4 border-b dark:border-gray-700 mb-4">
                <button onClick={() => { setSelectedRecipe(null); setServings(1); }} className="text-gray-500 dark:text-gray-400 flex items-center gap-2 mb-2 hover:text-green-600 font-bold">
                    <ArrowLeft size={20}/> 목록으로 돌아가기
                </button>
@@ -1831,7 +1872,7 @@ function RecipeView({ ingredients, onAddToCart, recipes, user }) {
                </div>
             </div>
             
-            {/* 🟢 [수정됨] 인분 조절기 (디자인 깨짐 해결: min-w, whitespace-nowrap 추가) */}
+            {/* 인분 조절기 (디자인 깨짐 방지 적용) */}
             <div className="bg-green-50 dark:bg-gray-800 p-4 rounded-2xl mb-6 border border-green-100 dark:border-gray-700 flex items-center justify-between">
                <span className="font-bold text-green-800 dark:text-green-400 flex items-center gap-2"><Users size={18}/> 기준 인원</span>
                <div className="flex items-center bg-white dark:bg-gray-700 rounded-lg shadow-sm">
@@ -1841,7 +1882,7 @@ function RecipeView({ ingredients, onAddToCart, recipes, user }) {
                </div>
             </div>
 
-            {/* 재료 선택 및 담기 */}
+            {/* 재료 선택 및 장바구니 담기 */}
             <div className="mb-8">
                 <div className="flex justify-between items-center mb-3">
                     <h3 className="text-lg font-bold flex items-center gap-2 dark:text-white"><ShoppingCart size={18}/> 재료 선택</h3>
@@ -1850,12 +1891,12 @@ function RecipeView({ ingredients, onAddToCart, recipes, user }) {
                     </button>
                 </div>
                 
-                {/* 재료량 설명 */}
+                {/* 재료량 설명 (인분 수에 따라 자동 계산) */}
                 <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-2xl text-sm text-gray-700 dark:text-gray-300 leading-relaxed mb-4 whitespace-pre-line">
                     {scaleText(selectedRecipe.measure, servings)}
                 </div>
 
-                {/* 재료 칩 리스트 (클릭 가능) */}
+                {/* 재료 칩 리스트 (클릭하여 선택/해제) */}
                 <div className="flex flex-wrap gap-2">
                     {selectedRecipe.ingredients.map((ing, i) => {
                         const have = ingredients.some(myIng => matchIngredient(ing, myIng.name));
@@ -1904,7 +1945,9 @@ function RecipeView({ ingredients, onAddToCart, recipes, user }) {
       );
   }
 
-  // --- 3. 레시피 목록 화면 ---
+  // ------------------------------------------------
+  // [VIEW 3] 레시피 목록 화면
+  // ------------------------------------------------
   return (
       <div className="p-4 pb-24 h-full flex flex-col bg-white dark:bg-gray-900 transition-colors">
         <div className="flex justify-between items-center mb-6">
