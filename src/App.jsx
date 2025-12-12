@@ -2123,3 +2123,17 @@ function InsightsView({ ingredients, onAddToCart, history, onResetHistory }) {
     </div>
   );
 }
+
+// 👇 이 코드를 파일 맨 마지막에 붙여넣으세요.
+
+function NavBtn({ active, onClick, icon, label, count }) {
+  return (
+    <button onClick={onClick} className={`flex flex-col items-center gap-1 relative ${active ? 'text-green-600 dark:text-green-400' : 'text-gray-400 dark:text-gray-500'}`}>
+      <div className="relative">
+        {React.cloneElement(icon, { size: 24, strokeWidth: active ? 2.5 : 2 })}
+        {count > 0 && <span className="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-[9px] font-bold w-4 h-4 rounded-full flex items-center justify-center ring-1 ring-white dark:ring-gray-800">{count}</span>}
+      </div>
+      <span className="text-[10px] font-medium">{label}</span>
+    </button>
+  );
+}
