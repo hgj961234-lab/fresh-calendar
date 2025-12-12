@@ -1287,7 +1287,7 @@ function AppContent({ user }) {
 }
 
 // --- 캘린더 뷰 ---
-function CalendarView({ ingredients, getRiskLevel, onAddRequest }) {
+function CalendarView({ ingredients, getRiskLevel, onAddRequest, onDateSelect }) { // onDateSelect prop 추가 확인
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDayInfo, setSelectedDayInfo] = useState(null);
 
@@ -1307,9 +1307,9 @@ function CalendarView({ ingredients, getRiskLevel, onAddRequest }) {
   return (
     <div className="p-4">
       <div className="flex justify-between items-center mb-6">
-        <button onClick={()=>setCurrentDate(new Date(year, month-1, 1))} className="p-2"><ChevronLeft /></button>
-        <h2 className="font-bold text-lg">{year}년 {month+1}월</h2>
-        <button onClick={()=>setCurrentDate(new Date(year, month+1, 1))} className="p-2"><ChevronRight /></button>
+        <button onClick={()=>setCurrentDate(new Date(year, month-1, 1))} className="p-2 dark:text-gray-200"><ChevronLeft /></button>
+        <h2 className="font-bold text-lg dark:text-white">{year}년 {month+1}월</h2>
+        <button onClick={()=>setCurrentDate(new Date(year, month+1, 1))} className="p-2 dark:text-gray-200"><ChevronRight /></button>
       </div>
       <div className="grid grid-cols-7 text-center text-xs text-gray-400 font-bold mb-2">
         {['일','월','화','수','목','금','토'].map(d=><div key={d}>{d}</div>)}
@@ -1321,8 +1321,11 @@ function CalendarView({ ingredients, getRiskLevel, onAddRequest }) {
           const dayItems = getItemsForDate(day);
           const isToday = day === new Date().getDate() && month === new Date().getMonth();
           return (
-            <div key={day} onClick={() => setSelectedDayInfo({ day, items: dayItems, dateObj: new Date(year, month, day) })} className={`h-16 border rounded-xl p-1 relative flex flex-col items-center justify-between cursor-pointer transition-colors hover:bg-green-50 ${isToday ? 'bg-green-50 border-green-400' : 'bg-white border-gray-100'}`}>
-              <span className={`text-xs font-bold ${isToday ? 'text-green-700' : 'text-gray-600'}`}>{day}</span>
+            <div key={day} onClick={() => { 
+                setSelectedDayInfo({ day, items: dayItems, dateObj: new Date(year, month, day) });
+                if(onDateSelect) onDateSelect(new Date(year, month, day)); 
+            }} className={`h-16 border rounded-xl p-1 relative flex flex-col items-center justify-between cursor-pointer transition-colors hover:bg-green-50 dark:hover:bg-gray-700 ${isToday ? 'bg-green-50 dark:bg-green-900/30 border-green-400' : 'bg-white dark:bg-gray-800 border-gray-100 dark:border-gray-700'}`}>
+              <span className={`text-xs font-bold ${isToday ? 'text-green-700 dark:text-green-400' : 'text-gray-600 dark:text-gray-300'}`}>{day}</span>
               <div className="flex flex-wrap justify-center gap-1 w-full px-0.5 mb-1">
                 {dayItems.slice(0, 4).map((item, idx) => {
                   const risk = getRiskLevel(item.expiry, item.name);
@@ -1336,12 +1339,12 @@ function CalendarView({ ingredients, getRiskLevel, onAddRequest }) {
       </div>
       {selectedDayInfo && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-4 animate-in fade-in" onClick={() => setSelectedDayInfo(null)}>
-          <div className="bg-white w-full max-w-sm rounded-2xl p-5 shadow-2xl" onClick={e => e.stopPropagation()}>
-            <div className="flex justify-between items-center mb-4"><h3 className="font-bold text-lg">{month+1}월 {selectedDayInfo.day}일 만료 목록</h3><button onClick={() => setSelectedDayInfo(null)}><X className="text-gray-400" /></button></div>
+          <div className="bg-white dark:bg-gray-800 w-full max-w-sm rounded-2xl p-5 shadow-2xl" onClick={e => e.stopPropagation()}>
+            <div className="flex justify-between items-center mb-4"><h3 className="font-bold text-lg dark:text-white">{month+1}월 {selectedDayInfo.day}일 만료 목록</h3><button onClick={() => setSelectedDayInfo(null)}><X className="text-gray-400" /></button></div>
             <div className="space-y-2 max-h-60 overflow-y-auto mb-4">
               {selectedDayInfo.items.length === 0 ? <p className="text-gray-400 text-center py-4 text-sm">만료되는 상품이 없습니다.</p> : selectedDayInfo.items.map(item => (
-                  <div key={item.id} className="flex justify-between items-center p-3 bg-gray-50 rounded-xl">
-                    <div className="flex items-center gap-2"><div className={`w-2 h-2 rounded-full ${getRiskLevel(item.expiry, item.name) === 'danger' ? 'bg-red-500' : 'bg-green-400'}`} /><span className="font-bold text-gray-700">{item.name}</span></div><span className="text-xs text-gray-500 capitalize">{item.category}</span>
+                  <div key={item.id} className="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-700 rounded-xl">
+                    <div className="flex items-center gap-2"><div className={`w-2 h-2 rounded-full ${getRiskLevel(item.expiry, item.name) === 'danger' ? 'bg-red-500' : 'bg-green-400'}`} /><span className="font-bold text-gray-700 dark:text-gray-200">{item.name}</span></div><span className="text-xs text-gray-500 dark:text-gray-400 capitalize">{item.category}</span>
                   </div>
               ))}
             </div>
@@ -1355,26 +1358,22 @@ function CalendarView({ ingredients, getRiskLevel, onAddRequest }) {
 
 // --- 냉장고 목록 뷰 (필터 & 정렬 추가 버전) ---
 function FridgeListView({ ingredients, getRiskLevel, moveToTrash, consumeItem, updateIngredient, onOpenTrash }) {
-  const [filter, setFilter] = useState('all'); // all, fridge, freezer, pantry
-  const [sort, setSort] = useState('expiry');  // expiry, name, newest
+  const [filter, setFilter] = useState('all'); 
+  const [sort, setSort] = useState('expiry');  
   const [selectedIds, setSelectedIds] = useState([]);
-  const [editingItem, setEditingItem] = useState(null);
+  const [editingItem, setEditingItem] = useState(null); // 에디팅 모달용 상태 (사용 안하면 제거 가능)
 
-  // 🟢 필터링 및 정렬 로직 적용
   const filtered = ingredients.filter(item => {
     if (filter === 'all') return true;
     return item.category === filter;
   });
 
   const sorted = [...filtered].sort((a, b) => {
-    if (sort === 'expiry') return (a.expiry || 0) - (b.expiry || 0); // 유통기한 임박순
-    if (sort === 'name') return a.name.localeCompare(b.name); // 이름순
-    if (sort === 'newest') return (b.addedDate || 0) - (a.addedDate || 0); // 최신등록순
+    if (sort === 'expiry') return (a.expiry || 0) - (b.expiry || 0);
+    if (sort === 'name') return a.name.localeCompare(b.name);
+    if (sort === 'newest') return (b.addedDate || 0) - (a.addedDate || 0);
     return 0;
   });
-
-  // ... (toggleSelect, toggleSelectAll 등 기존 함수 로직은 그대로 복사해서 쓰시면 됩니다) ...
-  // 기존 로직이 길어서 생략했습니다. 원래 함수 안에 있던 로직들을 유지해주세요.
   
   const toggleSelect = (id) => { if (selectedIds.includes(id)) setSelectedIds(selectedIds.filter(itemId => itemId !== id)); else setSelectedIds([...selectedIds, id]); };
   const toggleSelectAll = () => { if (selectedIds.length === ingredients.length && ingredients.length > 0) setSelectedIds([]); else setSelectedIds(ingredients.map(i => i.id)); };
@@ -1383,26 +1382,23 @@ function FridgeListView({ ingredients, getRiskLevel, moveToTrash, consumeItem, u
 
   return (
     <div className="p-4 pb-24">
-      {/* EditModal은 기존 코드 유지 */}
-      {/* ... */} 
-
       {/* 헤더 */}
       <div className="flex justify-between items-center mb-4">
-        <h2 className="text-lg font-bold flex items-center gap-2">내 냉장고 <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">{sorted.length}</span></h2>
-        <button onClick={onOpenTrash} className="p-2 text-gray-400 hover:text-red-500 bg-white rounded-full border border-gray-100 shadow-sm"><Trash2 size={18} /></button>
+        <h2 className="text-lg font-bold flex items-center gap-2 dark:text-white">내 냉장고 <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">{sorted.length}</span></h2>
+        <button onClick={onOpenTrash} className="p-2 text-gray-400 hover:text-red-500 bg-white dark:bg-gray-800 rounded-full border border-gray-100 dark:border-gray-700 shadow-sm"><Trash2 size={18} /></button>
       </div>
 
-      {/* 🟢 스마트 필터 & 정렬 컨트롤 */}
+      {/* 필터 & 정렬 */}
       <div className="flex flex-col gap-3 mb-4">
-        <div className="flex bg-gray-100 p-1 rounded-xl">
+        <div className="flex bg-gray-100 dark:bg-gray-800 p-1 rounded-xl">
             {['all', 'fridge', 'freezer', 'pantry'].map(f => (
-                <button key={f} onClick={() => setFilter(f)} className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${filter === f ? 'bg-white text-green-700 shadow-sm' : 'text-gray-400'}`}>
+                <button key={f} onClick={() => setFilter(f)} className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${filter === f ? 'bg-white dark:bg-gray-600 text-green-700 dark:text-green-300 shadow-sm' : 'text-gray-400'}`}>
                     {f === 'all' ? '전체' : f === 'fridge' ? '냉장' : f === 'freezer' ? '냉동' : '실온'}
                 </button>
             ))}
         </div>
         <div className="flex justify-end">
-            <select value={sort} onChange={e => setSort(e.target.value)} className="bg-white border border-gray-200 text-xs font-bold px-3 py-1.5 rounded-lg outline-none text-gray-600">
+            <select value={sort} onChange={e => setSort(e.target.value)} className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-xs font-bold px-3 py-1.5 rounded-lg outline-none text-gray-600 dark:text-gray-300">
                 <option value="expiry">⏳ 유통기한 급한순</option>
                 <option value="newest">✨ 최근 등록순</option>
                 <option value="name">가나다 이름순</option>
@@ -1410,9 +1406,9 @@ function FridgeListView({ ingredients, getRiskLevel, moveToTrash, consumeItem, u
         </div>
       </div>
 
-      {/* 선택 액션 버튼 */}
+      {/* 선택 액션 */}
       <div className="flex gap-2 mb-4">
-        <button onClick={toggleSelectAll} className="text-xs bg-white border border-gray-200 text-gray-600 px-3 py-2.5 rounded-xl font-bold flex items-center gap-1 shadow-sm flex-1 justify-center">
+        <button onClick={toggleSelectAll} className="text-xs bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 px-3 py-2.5 rounded-xl font-bold flex items-center gap-1 shadow-sm flex-1 justify-center">
             {selectedIds.length === sorted.length && sorted.length > 0 ? <CheckSquare size={14} className="text-green-600" /> : <Square size={14} />} 전체
         </button>
         {selectedIds.length > 0 && (
@@ -1423,23 +1419,20 @@ function FridgeListView({ ingredients, getRiskLevel, moveToTrash, consumeItem, u
         )}
       </div>
 
-      {/* 리스트 아이템 (기존 로직 사용하되 sorted 데이터 매핑) */}
+      {/* 리스트 아이템 */}
       <div className="space-y-3">
         {sorted.map(item => {
-           // ... (여기는 기존 FridgeListView의 return 내부 map 함수 내용을 그대로 쓰면 됩니다) ...
-           // 아이템 디자인은 기존과 동일합니다.
            const risk = getRiskLevel(item.expiry, item.name);
            const diff = item.expiry ? Math.ceil((item.expiry - new Date().setHours(0,0,0,0)) / (86400000)) : 0;
            const isSelected = selectedIds.includes(item.id);
            return (
-            <div key={item.id} className={`bg-white p-4 rounded-2xl border shadow-sm transition-all flex items-center justify-between group cursor-pointer ${isSelected ? 'ring-2 ring-green-500 bg-green-50' : 'hover:border-green-300'}`} onClick={() => toggleSelect(item.id)}>
-              {/* 아이템 내부 내용은 기존 코드 복사 붙여넣기 */}
+            <div key={item.id} className={`bg-white dark:bg-gray-800 p-4 rounded-2xl border dark:border-gray-700 shadow-sm transition-all flex items-center justify-between group cursor-pointer ${isSelected ? 'ring-2 ring-green-500 bg-green-50 dark:bg-green-900/20' : 'hover:border-green-300'}`} onClick={() => toggleSelect(item.id)}>
                <div className="flex items-center gap-3 flex-1">
                  <div className={`text-gray-300 ${isSelected ? 'text-green-600' : ''}`}>{isSelected ? <CheckSquare size={20} /> : <Square size={20} />}</div>
                  <div className={`w-1.5 h-10 rounded-full ${risk === 'danger' ? 'bg-red-500' : risk === 'warning' ? 'bg-yellow-400' : 'bg-green-400'}`}></div>
                  <div>
-                   <h3 className="font-bold text-gray-800 flex items-center gap-1">{item.name} <span className="text-[10px] font-normal text-gray-400 border px-1 rounded">{item.category}</span></h3>
-                   <p className={`text-xs mt-0.5 ${risk === 'danger' ? 'text-red-500 font-bold' : 'text-gray-500'}`}>{diff < 0 ? '만료됨' : diff === 0 ? '오늘 만료' : `D-${diff}`}</p>
+                   <h3 className="font-bold text-gray-800 dark:text-gray-100 flex items-center gap-1">{item.name} <span className="text-[10px] font-normal text-gray-400 dark:border-gray-600 border px-1 rounded">{item.category}</span></h3>
+                   <p className={`text-xs mt-0.5 ${risk === 'danger' ? 'text-red-500 font-bold' : 'text-gray-500 dark:text-gray-400'}`}>{diff < 0 ? '만료됨' : diff === 0 ? '오늘 만료' : `D-${diff}`}</p>
                  </div>
                </div>
             </div>
@@ -1491,7 +1484,6 @@ function TrashView({ trashItems, onRestore, onPermanentDelete, onClose }) {
 function AddItemModal({ onClose, onAdd, initialDate }) {
   const [name, setName] = useState('');
   const [category, setCategory] = useState('fridge');
-  // 날짜 초기값 설정
   const [expiry, setExpiry] = useState(
     initialDate 
       ? new Date(initialDate.getTime() - (initialDate.getTimezoneOffset() * 60000)).toISOString().split('T')[0] 
@@ -1501,36 +1493,23 @@ function AddItemModal({ onClose, onAdd, initialDate }) {
   const [amount, setAmount] = useState('');
   const [unit, setUnit] = useState('g');
 
-  // 이름 입력 시 DB에서 정보(유통기한, 가격, 단위) 자동 불러오기
   const handleNameChange = (val) => {
     setName(val);
-    
-    // DB에서 데이터 찾기 (정확한 이름 -> 공백제거 이름 -> 기본값 순)
     const dbItem = SHELF_LIFE_DB[val] || SHELF_LIFE_DB[val.replace(/\s/g, '')];
-    
     if (dbItem) {
-      // 1. 카테고리 자동 설정 (냉동 우선순위가 있으면 냉동으로, 아니면 냉장)
       if (dbItem.freezer && !dbItem.fridge) setCategory('freezer');
       else if (dbItem.pantry) setCategory('pantry');
       else setCategory('fridge');
 
-      // 2. 유통기한 자동 계산
       const days = dbItem.fridge || dbItem.freezer || dbItem.pantry || 7;
       const date = new Date();
       date.setDate(date.getDate() + days);
       setExpiry(date.toISOString().split('T')[0]);
 
-      // 3. 가격 자동 설정
       if (dbItem.price) setPrice(dbItem.price);
-
-      // 4. 단위 자동 설정
       if (dbItem.unit) {
-         // 숫자 제외하고 문자만 추출 (예: '3kg' -> 'kg')
          const extractedUnit = dbItem.unit.replace(/[0-9.]/g, ''); 
-         if (['g', 'kg', 'ml', 'L', '개', '봉'].includes(extractedUnit)) {
-            setUnit(extractedUnit);
-         }
-         // 기본 용량 추출 (예: '3kg' -> 3)
+         if (['g', 'kg', 'ml', 'L', '개', '봉'].includes(extractedUnit)) setUnit(extractedUnit);
          const extractedAmount = parseFloat(dbItem.unit);
          if (extractedAmount) setAmount(extractedAmount);
       }
@@ -1540,129 +1519,64 @@ function AddItemModal({ onClose, onAdd, initialDate }) {
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!name) return;
-
-    onAdd({
-      name,
-      expiry: new Date(expiry),
-      category,
-      price: Number(price) || 0,
-      amount: Number(amount) || 0,
-      unit: unit
-    });
+    onAdd({ name, expiry: new Date(expiry), category, price: Number(price) || 0, amount: Number(amount) || 0, unit: unit });
     onClose();
   };
 
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4 animate-in fade-in duration-200" onClick={onClose}>
-      <div className="bg-white w-full max-w-sm rounded-3xl p-6 shadow-2xl scale-100 transition-transform" onClick={e => e.stopPropagation()}>
+      <div className="bg-white dark:bg-gray-800 w-full max-w-sm rounded-3xl p-6 shadow-2xl scale-100 transition-transform" onClick={e => e.stopPropagation()}>
         
-        {/* 헤더 */}
         <div className="flex justify-between items-center mb-6">
-          <h2 className="text-xl font-bold text-gray-800">새 재료 추가</h2>
-          <button onClick={onClose} className="p-2 bg-gray-100 rounded-full text-gray-500 hover:bg-gray-200 transition-colors">
-            <X size={20} />
+          <h2 className="text-xl font-bold text-gray-800 dark:text-white">새 재료 추가</h2>
+          <button onClick={onClose} className="p-2 bg-gray-100 dark:bg-gray-700 rounded-full text-gray-500 hover:bg-gray-200 transition-colors">
+            <X size={20} className="dark:text-white"/>
           </button>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          
-          {/* 1. 이름 입력 */}
           <div>
-            <label className="block text-xs font-bold text-gray-500 mb-1 ml-1">제품명</label>
-            <input
-              type="text"
-              required
-              autoFocus
-              value={name}
-              onChange={(e) => handleNameChange(e.target.value)}
-              className="w-full p-4 bg-gray-50 rounded-2xl text-lg font-bold border-2 border-transparent focus:border-green-500 focus:bg-white outline-none transition-all placeholder:font-normal"
-              placeholder="예: 우유, 두부"
-            />
+            <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1 ml-1">제품명</label>
+            <input type="text" required autoFocus value={name} onChange={(e) => handleNameChange(e.target.value)} className="w-full p-4 bg-gray-50 dark:bg-gray-700 dark:text-white rounded-2xl text-lg font-bold border-2 border-transparent focus:border-green-500 focus:bg-white dark:focus:bg-gray-600 outline-none transition-all placeholder:font-normal" placeholder="예: 우유, 두부" />
           </div>
 
-          {/* 2. 카테고리 선택 */}
           <div className="flex gap-2">
             {['fridge', 'freezer', 'pantry'].map(cat => (
-              <button
-                key={cat}
-                type="button"
-                onClick={() => setCategory(cat)}
-                className={`flex-1 py-3 rounded-xl text-sm font-bold transition-all ${
-                  category === cat 
-                    ? 'bg-gray-800 text-white shadow-lg scale-105' 
-                    : 'bg-gray-100 text-gray-400 hover:bg-gray-200'
-                }`}
-              >
+              <button key={cat} type="button" onClick={() => setCategory(cat)} className={`flex-1 py-3 rounded-xl text-sm font-bold transition-all ${category === cat ? 'bg-gray-800 dark:bg-green-600 text-white shadow-lg scale-105' : 'bg-gray-100 dark:bg-gray-700 text-gray-400 hover:bg-gray-200'}`}>
                 {cat === 'fridge' ? '냉장' : cat === 'freezer' ? '냉동' : '실온'}
               </button>
             ))}
           </div>
 
-          {/* 3. 용량 및 단위 (요청하신 부분) */}
           <div className="flex gap-2">
             <div className="flex-[2]">
-              <label className="block text-xs font-bold text-gray-500 mb-1 ml-1">용량/수량</label>
-              <input 
-                type="number" 
-                value={amount} 
-                onChange={e => setAmount(e.target.value)} 
-                className="w-full p-3 bg-gray-50 rounded-xl border border-gray-100 focus:border-green-500 outline-none" 
-                placeholder="0"
-              />
+              <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1 ml-1">용량/수량</label>
+              <input type="number" value={amount} onChange={e => setAmount(e.target.value)} className="w-full p-3 bg-gray-50 dark:bg-gray-700 dark:text-white rounded-xl border border-gray-100 dark:border-gray-600 focus:border-green-500 outline-none" placeholder="0" />
             </div>
             <div className="flex-1">
-              <label className="block text-xs font-bold text-gray-500 mb-1 ml-1">단위</label>
-              <select 
-                value={unit} 
-                onChange={e => setUnit(e.target.value)}
-                className="w-full p-3 bg-gray-50 rounded-xl border border-gray-100 focus:border-green-500 outline-none text-center appearance-none"
-              >
-                <option value="g">g</option>
-                <option value="kg">kg</option>
-                <option value="ml">ml</option>
-                <option value="L">L</option>
-                <option value="개">개</option>
-                <option value="봉">봉</option>
+              <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1 ml-1">단위</label>
+              <select value={unit} onChange={e => setUnit(e.target.value)} className="w-full p-3 bg-gray-50 dark:bg-gray-700 dark:text-white rounded-xl border border-gray-100 dark:border-gray-600 focus:border-green-500 outline-none text-center appearance-none">
+                <option value="g">g</option><option value="kg">kg</option><option value="ml">ml</option><option value="L">L</option><option value="개">개</option><option value="봉">봉</option>
               </select>
             </div>
           </div>
 
-          {/* 4. 가격 입력 */}
           <div>
-            <label className="block text-xs font-bold text-gray-500 mb-1 ml-1">구매 가격 (원)</label>
+            <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1 ml-1">구매 가격 (원)</label>
             <div className="relative">
               <span className="absolute left-4 top-3.5 text-gray-400">₩</span>
-              <input
-                type="number"
-                value={price}
-                onChange={(e) => setPrice(e.target.value)}
-                className="w-full p-3 pl-8 bg-gray-50 rounded-xl border border-gray-100 focus:border-green-500 outline-none"
-                placeholder="0"
-              />
+              <input type="number" value={price} onChange={(e) => setPrice(e.target.value)} className="w-full p-3 pl-8 bg-gray-50 dark:bg-gray-700 dark:text-white rounded-xl border border-gray-100 dark:border-gray-600 focus:border-green-500 outline-none" placeholder="0" />
             </div>
           </div>
 
-          {/* 5. 유통기한 입력 */}
           <div>
-            <label className="block text-xs font-bold text-gray-500 mb-1 ml-1">유통기한</label>
-            <input
-              type="date"
-              required
-              value={expiry}
-              onChange={(e) => setExpiry(e.target.value)}
-              className="w-full p-3 bg-gray-50 rounded-xl border border-gray-100 focus:border-green-500 outline-none font-medium"
-            />
+            <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1 ml-1">유통기한</label>
+            <input type="date" required value={expiry} onChange={(e) => setExpiry(e.target.value)} className="w-full p-3 bg-gray-50 dark:bg-gray-700 dark:text-white rounded-xl border border-gray-100 dark:border-gray-600 focus:border-green-500 outline-none font-medium" />
           </div>
 
-          {/* 6. 추가 버튼 */}
-          <button
-            type="submit"
-            className="w-full bg-green-600 text-white py-4 rounded-2xl font-bold text-lg shadow-lg hover:bg-green-700 active:scale-95 transition-all mt-4 flex items-center justify-center gap-2"
-          >
-            <Plus size={24} strokeWidth={3} />
-            냉장고에 넣기
+          <button type="submit" className="w-full bg-green-600 text-white py-4 rounded-2xl font-bold text-lg shadow-lg hover:bg-green-700 active:scale-95 transition-all mt-4 flex items-center justify-center gap-2">
+            <Plus size={24} strokeWidth={3} /> 냉장고에 넣기
           </button>
-
         </form>
       </div>
     </div>
@@ -2096,42 +2010,29 @@ function RecipeView({ ingredients, onAddToCart, recipes, user }) {
   
 // --- NEW: 실제 데이터 기반 통계 뷰 ---
 function InsightsView({ ingredients, onAddToCart, history, onResetHistory }) {
-  // 1. 소비(Used)된 금액 총액 계산
   const totalUsed = history.filter(h => h.action === 'used').reduce((sum, item) => sum + (item.price || 0), 0);
-  
-  // 2. 폐기(Wasted)된 금액 총액 계산
   const totalWasted = history.filter(h => h.action === 'wasted').reduce((sum, item) => sum + (item.price || 0), 0);
-
-  // 3. 순수 절약 금액 계산: (사용 금액 * 60%) - 폐기 금액
   const rawSavings = Math.round(totalUsed * 0.6);
   const netSavings = rawSavings - totalWasted;
-
-  // 4. 자주 쓰는 재료 랭킹 (Used 기준)
   const usageCounts = history.filter(h => h.action === 'used').reduce((acc, item) => {
       acc[item.name] = (acc[item.name] || 0) + 1;
       return acc;
   }, {});
   const rankedItems = Object.entries(usageCounts).sort(([,a], [,b]) => b - a).slice(0, 5);
   const maxCount = rankedItems.length > 0 ? rankedItems[0][1] : 1;
-
-  // 숫자 포맷팅 (예: 12,000)
   const formatMoney = (amount) => new Intl.NumberFormat('ko-KR').format(amount);
 
   return (
     <div className="p-4 pb-20 animate-in fade-in duration-500">
       <div className="flex justify-between items-center mb-4">
-        <h2 className="text-lg font-bold flex items-center gap-2">
+        <h2 className="text-lg font-bold flex items-center gap-2 dark:text-white">
           <BarChart2 className="text-green-600" /> 통계 및 분석
         </h2>
-        <button 
-          onClick={onResetHistory} 
-          className="text-xs bg-gray-100 text-gray-500 px-3 py-1.5 rounded-lg flex items-center gap-1 hover:bg-red-50 hover:text-red-600 transition-colors"
-        >
+        <button onClick={onResetHistory} className="text-xs bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-300 px-3 py-1.5 rounded-lg flex items-center gap-1 hover:bg-red-50 hover:text-red-600 transition-colors">
           <RefreshCcw size={12} /> 기록 초기화
         </button>
       </div>
       
-      {/* 절약 금액 카드 (메인) */}
       <div className={`p-6 rounded-3xl shadow-lg mb-6 text-white relative overflow-hidden transition-colors ${netSavings >= 0 ? 'bg-gradient-to-br from-green-500 to-green-700' : 'bg-gradient-to-br from-red-500 to-red-700'}`}>
         <div className="absolute top-0 right-0 p-8 opacity-10"><DollarSign size={100} /></div>
         <div className="relative z-10">
@@ -2153,39 +2054,31 @@ function InsightsView({ ingredients, onAddToCart, history, onResetHistory }) {
         </div>
       </div>
 
-      <div className="bg-white p-5 rounded-2xl border shadow-sm mb-4">
-        <h3 className="text-sm font-bold text-gray-500 mb-3 flex items-center gap-1"><PieChart size={14} /> 현재 냉장고 상태</h3>
+      <div className="bg-white dark:bg-gray-800 p-5 rounded-2xl border dark:border-gray-700 shadow-sm mb-4">
+        <h3 className="text-sm font-bold text-gray-500 dark:text-gray-400 mb-3 flex items-center gap-1"><PieChart size={14} /> 현재 냉장고 상태</h3>
         <div className="flex items-center justify-between">
             <div className="text-center"><div className="text-2xl font-bold text-green-600">{ingredients.length}</div><div className="text-xs text-gray-400">보관 중</div></div>
-            <div className="h-8 w-[1px] bg-gray-200"></div>
+            <div className="h-8 w-[1px] bg-gray-200 dark:bg-gray-600"></div>
             <div className="text-center"><div className="text-2xl font-bold text-blue-500">{history.filter(h=>h.action==='used').length}</div><div className="text-xs text-gray-400">누적 소비</div></div>
-            <div className="h-8 w-[1px] bg-gray-200"></div>
+            <div className="h-8 w-[1px] bg-gray-200 dark:bg-gray-600"></div>
             <div className="text-center"><div className="text-2xl font-bold text-red-500">{history.filter(h=>h.action==='wasted').length}</div><div className="text-xs text-gray-400">누적 폐기</div></div>
         </div>
       </div>
 
-      <div className="bg-white p-5 rounded-2xl border shadow-sm mb-4">
-        <h3 className="text-sm font-bold text-gray-500 mb-4 flex items-center gap-1"><TrendingUp size={14} /> 자주 먹은 식재료 Top 5</h3>
+      <div className="bg-white dark:bg-gray-800 p-5 rounded-2xl border dark:border-gray-700 shadow-sm mb-4">
+        <h3 className="text-sm font-bold text-gray-500 dark:text-gray-400 mb-4 flex items-center gap-1"><TrendingUp size={14} /> 자주 먹은 식재료 Top 5</h3>
         <div className="space-y-4">
           {rankedItems.length > 0 ? rankedItems.map(([name, count], idx) => (
             <div key={idx} className="group">
               <div className="flex justify-between items-center text-xs mb-1">
-                <span className="font-bold text-gray-700">{name}</span>
-                <div className="flex items-center gap-2"><span className="text-gray-400">{count}회 사용</span><button onClick={() => { onAddToCart(name);}} className="bg-green-50 text-green-600 p-1 rounded hover:bg-green-100 transition-colors" title="장바구니에 담기"><Plus size={12} /></button></div>
+                <span className="font-bold text-gray-700 dark:text-gray-200">{name}</span>
+                <div className="flex items-center gap-2"><span className="text-gray-400">{count}회 사용</span><button onClick={() => { onAddToCart(name);}} className="bg-green-50 dark:bg-gray-700 text-green-600 dark:text-green-400 p-1 rounded hover:bg-green-100 transition-colors" title="장바구니에 담기"><Plus size={12} /></button></div>
               </div>
-              <div className="w-full bg-gray-100 rounded-full h-2"><div className="bg-green-500 h-2 rounded-full transition-all duration-1000" style={{ width: `${(count / maxCount) * 100}%` }}></div></div>
+              <div className="w-full bg-gray-100 dark:bg-gray-700 rounded-full h-2"><div className="bg-green-500 h-2 rounded-full transition-all duration-1000" style={{ width: `${(count / maxCount) * 100}%` }}></div></div>
             </div>
           )) : <div className="text-center text-gray-400 text-xs py-4">아직 사용 기록이 없습니다.<br/>냉장고에서 '사용' 버튼을 눌러보세요.</div>}
         </div>
       </div>
     </div>
-  );
-}
-
-function NavBtn({ active, onClick, icon, label, count }) {
-  return (
-    <button onClick={onClick} className={`flex flex-col items-center gap-1 relative ${active ? 'text-green-600' : 'text-gray-400'}`}>
-      <div className="relative">{React.cloneElement(icon, { size: 24, strokeWidth: active ? 2.5 : 2 })}{count > 0 && <span className="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-[9px] font-bold w-4 h-4 rounded-full flex items-center justify-center ring-1 ring-white">{count}</span>}</div><span className="text-[10px] font-medium">{label}</span>
-    </button>
   );
 }
