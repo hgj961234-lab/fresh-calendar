@@ -1094,7 +1094,7 @@ function InsightsView({ ingredients, onAddToCart, history, onResetHistory }) {
       </div>
       
       {/* 🟢 [수정됨] PC에서는 가로(grid-cols-3), 모바일은 세로(grid-cols-1) 배치 */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
       
           {/* 카드 1: 절약 금액 */}
           <div className={`p-6 rounded-3xl shadow-lg text-white relative overflow-hidden transition-colors ${netSavings >= 0 ? 'bg-gradient-to-br from-green-500 to-green-700' : 'bg-gradient-to-br from-red-500 to-red-700'}`}>
