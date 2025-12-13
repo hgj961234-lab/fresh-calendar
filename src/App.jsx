@@ -208,10 +208,12 @@ const ZONES = {
   FRIDGE_FRESH_2: '🥬 냉장실: 신선야채실 (우)',
   FRIDGE_MULTI_1: '🥓 냉장실: 멀티수납코너 (좌)',
   FRIDGE_MULTI_2: '🥓 냉장실: 멀티수납코너 (우)',
-  FRIDGE_DOOR_LEFT: '🚪 냉장실: 좌측 도어',
-  FRIDGE_DOOR_RIGHT: '🚪 냉장실: 우측 도어',
-  FREEZER_LEFT_DOOR: '❄️ 냉동실: 좌측 도어',
-  FREEZER_RIGHT_DOOR: '❄️ 냉동실: 우측 도어',
+  FRIDGE_DOOR_LEFT_1: '🚪 냉장실: 좌측 도어 (상)',
+  FRIDGE_DOOR_LEFT_2: '🚪 냉장실: 좌측 도어 (중)',
+  FRIDGE_DOOR_LEFT_3: '🚪 냉장실: 좌측 도어 (하)',
+  FRIDGE_DOOR_RIGHT_1: '🚪 냉장실: 우측 도어 (상)',
+  FRIDGE_DOOR_RIGHT_2: '🚪 냉장실: 우측 도어 (중)',
+  FRIDGE_DOOR_RIGHT_3: '🚪 냉장실: 우측 도어 (하)',
   FREEZER_LEFT_1: '❄️ 냉동실: 좌측 서랍 (상)',
   FREEZER_LEFT_2: '❄️ 냉동실: 좌측 서랍 (중)',
   FREEZER_LEFT_3: '❄️ 냉동실: 좌측 서랍 (하)',
@@ -221,7 +223,7 @@ const ZONES = {
   PANTRY: '🏠 실온: 다용도실/팬트리'
 };
 
-// 🌟 [신규] LG 4도어 냉장고 맞춤 위치 추천 알고리즘 (모든 DB 재료 포함)
+// 🌟 [신규] LG 4도어 냉장고 맞춤 위치 추천 알고리즘 (도어 3단 분할 적용 완료)
 const getRecommendedZone = (name, category) => {
   const n = name.replace(/\s/g, ''); // 공백 제거하여 매칭 정확도 향상
 
@@ -234,13 +236,21 @@ const getRecommendedZone = (name, category) => {
   // 2. ❄️ 냉동실 (Freezer) - 하단
   // ------------------------------------------------
   if (category === 'freezer') {
-    // ❄️ [냉동] 좌측 도어: 자주 쓰는 양념류, 작은 식재료
-    if (['마늘', '다진마늘', '대파', '쪽파', '고추', '청양고추', '생강', '고춧가루'].some(k => n.includes(k))) 
-      return '❄️ 냉동실: 좌측 도어';
+    // ❄️ [냉동] 좌측 도어 (조리용 양념/채소)
+    // (상) 작고 자주 쓰는 큐브형 양념
+    if (['다진마늘', '마늘', '생강', '고추', '청양고추', '큐브'].some(k => n.includes(k)))
+      return '❄️ 냉동실: 좌측 도어 (상)';
+    // (하) 부피가 큰 봉지형 양념/채소
+    if (['대파', '쪽파', '고춧가루', '파'].some(k => n.includes(k)))
+      return '❄️ 냉동실: 좌측 도어 (하)';
 
-    // ❄️ [냉동] 우측 도어: 간식, 빵, 떡, 가루, 견과류
-    if (['아이스크림', '얼음', '떡', '빵', '식빵', '바게트', '또띠아', '치즈', '버터', '피자'].some(k => n.includes(k))) 
-      return '❄️ 냉동실: 우측 도어';
+    // ❄️ [냉동] 우측 도어 (간식/가루/빵)
+    // (상) 아이스크림, 작게 소분된 것
+    if (['아이스크림', '버터', '치즈', '견과류', '아몬드', '호두'].some(k => n.includes(k)))
+      return '❄️ 냉동실: 우측 도어 (상)';
+    // (하) 빵, 떡, 가루 등 부피 큰 것
+    if (['떡', '빵', '식빵', '바게트', '또띠아', '피자', '얼음', '가루', '전분', '밀가루', '튀김가루'].some(k => n.includes(k)))
+      return '❄️ 냉동실: 우측 도어 (하)';
     
     // ❄️ [냉동] 좌측 서랍 (육류 위주)
     // 상: 얇은 고기, 가공육 (빨리 먹거나 작은 것)
@@ -264,13 +274,36 @@ const getRecommendedZone = (name, category) => {
     if (['멸치', '건어물', '김', '미역', '다시마', '황태', '쥐포'].some(k => n.includes(k))) 
       return '❄️ 냉동실: 우측 서랍 (하)';
     
-    // 냉동 기본값: 우측 상단 서랍 (찾기 쉽게)
+    // 냉동 기본값: 찾기 쉽게 우측 상단 서랍
     return '❄️ 냉동실: 우측 서랍 (상)'; 
   }
 
   // ------------------------------------------------
   // 3. 🧊 냉장실 (Fridge) - 상단
   // ------------------------------------------------
+
+  // 🚪 [냉장] 좌측 도어 (소스/양념류) - 3단 분할
+  // (상) 작고 가벼운 튜브/병
+  if (['와사비', '연겨자', '시럽', '핫소스', '바닐라', '약'].some(k => n.includes(k)))
+    return '🚪 냉장실: 좌측 도어 (상)';
+  // (중) 가장 자주 쓰는 소스류 (손이 잘 닿는 곳)
+  if (['케찹', '케첩', '마요네즈', '드레싱', '머스타드', '잼', '소스', '양념'].some(k => n.includes(k)))
+    return '🚪 냉장실: 좌측 도어 (중)';
+  // (하) 무거운 장류, 큰 병
+  if (['고추장', '된장', '쌈장', '굴소스', '액젓', '간장', '다진마늘', '장아찌'].some(k => n.includes(k)))
+    return '🚪 냉장실: 좌측 도어 (하)';
+
+  // 🚪 [냉장] 우측 도어 (음료/유제품) - 3단 분할
+  // (상) 가벼운 유제품, 치즈
+  if (['치즈', '버터', '크림치즈', '요거트', '유산균', '생크림', '야쿠르트'].some(k => n.includes(k)))
+    return '🚪 냉장실: 우측 도어 (상)';
+  // (중) 자주 마시는 음료 (우유, 주스)
+  if (['우유', '주스', '콜라', '사이다', '캔맥주', '음료', '두유'].some(k => n.includes(k)))
+    return '🚪 냉장실: 우측 도어 (중)';
+  // (하) 무거운 물병, 주류
+  if (['물', '생수', '맥주', '소주', '와인', '대용량'].some(k => n.includes(k)))
+    return '🚪 냉장실: 우측 도어 (하)';
+
 
   // 🥬 [냉장] 신선야채실 (하단 서랍)
   // 좌측: 잎채소, 뿌리채소, 요리용 채소
@@ -287,14 +320,6 @@ const getRecommendedZone = (name, category) => {
   // 우측: 계란 (전용 트레이 가정)
   if (['계란','달걀','메추리알'].some(k => n.includes(k))) 
     return '🥓 냉장실: 멀티수납코너 (우)';
-
-  // 🚪 [냉장] 도어 바스켓
-  // 좌측: 소스, 양념류 (온도 변화에 상대적으로 강한 것)
-  if (['케찹','마요네즈','소스','드레싱','잼','고추장','된장','쌈장','굴소스','머스타드','액젓','시럽','다진마늘','와사비'].some(k => n.includes(k))) 
-    return '🚪 냉장실: 좌측 도어';
-  // 우측: 음료, 유제품 (자주 꺼내는 것)
-  if (['우유','주스','물','맥주','소주','콜라','사이다','음료','요거트','유산균','생크림','치즈'].some(k => n.includes(k))) 
-    return '🚪 냉장실: 우측 도어';
 
   // 🥘 [냉장] 메인 선반
   // 하단: 김치, 장류, 무거운 것 (가장 시원하고 안정적)
@@ -1333,6 +1358,17 @@ function AppContent({ user }) {
     toast.success("복구되었습니다!");
   };
 
+// 🌟 [신규] 기록 없이 단순 삭제 (실수 방지용)
+  const deleteItemImmediately = async (ids) => {
+    if (!confirm("기록에 남기지 않고 완전히 삭제하시겠습니까?")) return;
+    const batch = writeBatch(db);
+    ids.forEach(id => {
+      batch.delete(doc(db, `users/${user.uid}/ingredients`, id));
+    });
+    await batch.commit();
+    toast.success("삭제되었습니다.");
+  };
+  
   const permanentDelete = async (id) => {
     await deleteDoc(doc(db, `users/${user.uid}/trash`, id));
     toast.success("영구 삭제됨");
@@ -1642,8 +1678,15 @@ function FridgeListView({ ingredients, getRiskLevel, moveToTrash, consumeItem, u
           {/* 선택 액션 및 리스트 */}
           <div className="flex gap-2 mb-4">
               <button onClick={toggleSelectAll} className="text-xs bg-white border border-gray-200 text-gray-600 px-3 py-2.5 rounded-xl font-bold flex items-center gap-1 shadow-sm flex-1 justify-center">{selectedIds.length === sorted.length && sorted.length > 0 ? <CheckSquare size={14} className="text-green-600" /> : <Square size={14} />} 전체</button>
-              {selectedIds.length > 0 && (<><button onClick={handleConsumeSelected} className="text-xs bg-green-600 text-white px-3 py-2.5 rounded-xl font-bold shadow-md flex-[2] flex items-center justify-center gap-1"><Utensils size={14} /> 먹었어요</button><button onClick={handleWasteSelected} className="text-xs bg-red-100 text-red-600 px-3 py-2.5 rounded-xl font-bold shadow-sm flex-1 flex items-center justify-center gap-1"><Trash2 size={14} /> 버릴래요</button></>)}
-          </div>
+              {selectedIds.length > 0 && (
+        <>
+          <button onClick={handleConsumeSelected} className="text-xs bg-green-600 text-white px-3 py-2.5 rounded-xl font-bold shadow-md flex-[2] flex items-center justify-center gap-1"><Utensils size={14} /> 먹었어요</button>
+          <button onClick={handleWasteSelected} className="text-xs bg-red-100 text-red-600 px-3 py-2.5 rounded-xl font-bold shadow-sm flex-1 flex items-center justify-center gap-1"><Trash2 size={14} /> 버릴래요</button>
+          {/* 🌟 [추가] 단순 삭제 버튼 */}
+          <button onClick={(e) => {e.stopPropagation(); deleteItemImmediately(selectedIds); setSelectedIds([]);}} className="text-xs bg-gray-200 text-gray-600 px-3 py-2.5 rounded-xl font-bold shadow-sm flex-1 flex items-center justify-center gap-1"><X size={14} /> 삭제</button>
+        </>
+      )}
+    </div>
 
           <div className="space-y-3">
             {sorted.map(item => {
@@ -1728,10 +1771,10 @@ function AddItemModal({ onClose, onAdd, initialDate }) {
 
   const handleLocationChange = (newLoc) => {
     setLocation(newLoc);
-    // 위치를 바꾸면 카테고리(냉장/냉동/실온)도 같이 맞춰줌 (필터링 오류 방지)
+    // 🌟 [수정] 필터링 오류 해결을 위해 텍스트 포함 여부로 확실하게 카테고리 설정
     if (newLoc.includes('냉동')) setCategory('freezer');
-    else if (newLoc.includes('실온')) setCategory('pantry');
-    else setCategory('fridge');
+    else if (newLoc.includes('실온') || newLoc.includes('팬트리')) setCategory('pantry');
+    else setCategory('fridge'); // 기본값 냉장
   };
 
   const handleNameChange = (val) => {
@@ -2524,17 +2567,20 @@ function EditIngredientModal({ item, onClose, onUpdate }) {
 function FridgeMap({ ingredients, onItemClick }) {
   const getItems = (zoneName) => ingredients.filter(i => i.location === zoneName);
 
-  const renderItems = (zoneName) => {
+  const renderItems = (zoneName, label = null) => {
     const items = getItems(zoneName);
     return (
-      <div className="flex flex-wrap content-start gap-1 h-full overflow-y-auto min-h-[40px] p-1">
-        {items.length === 0 && <span className="text-[8px] text-gray-300 w-full text-center py-2">-</span>}
-        {items.map(item => (
-           <button key={item.id} onClick={(e) => { e.stopPropagation(); onItemClick(item); }} className="bg-white border shadow-sm rounded px-1.5 py-0.5 text-[9px] font-bold text-gray-700 truncate max-w-full hover:bg-green-100 flex items-center gap-1">
-             <div className={`w-1.5 h-1.5 rounded-full ${new Date(item.expiry) < new Date() ? 'bg-red-500' : 'bg-green-400'}`} />
-             {item.name}
-           </button>
-        ))}
+      <div className="flex flex-col h-full overflow-hidden relative">
+        {/* 🌟 라벨을 위쪽에 고정된 블록으로 배치하여 재료와 겹치지 않게 함 */}
+        {label && <div className="text-[8px] text-gray-400 font-bold px-1 py-0.5 bg-white/50 w-full border-b border-gray-100">{label}</div>}
+        <div className="flex flex-wrap content-start gap-1 overflow-y-auto p-1 min-h-[50px] flex-1">
+          {items.map(item => (
+            <button key={item.id} onClick={(e) => { e.stopPropagation(); onItemClick(item); }} className="bg-white border shadow-sm rounded px-1.5 py-0.5 text-[9px] font-bold text-gray-700 truncate max-w-full hover:bg-green-100 flex items-center gap-1 shrink-0">
+              <div className={`w-1.5 h-1.5 rounded-full ${new Date(item.expiry) < new Date() ? 'bg-red-500' : 'bg-green-400'}`} />
+              {item.name}
+            </button>
+          ))}
+        </div>
       </div>
     );
   };
@@ -2542,15 +2588,35 @@ function FridgeMap({ ingredients, onItemClick }) {
   return (
     <div className="p-2 animate-in fade-in zoom-in duration-300 pb-20">
       {/* 🌟 전체 냉장고 프레임 */}
-      <div className="border-[8px] border-gray-300 rounded-[30px] shadow-2xl bg-gray-200 overflow-hidden flex flex-col h-[80vh] md:h-[700px]">
+      <div className="border-[8px] border-gray-300 rounded-[30px] shadow-2xl bg-gray-200 overflow-hidden flex flex-col h-[85vh] md:h-[700px]">
         
         {/* 1️⃣ 상단: 냉장실 (60% 높이) */}
-        <div className="flex-[3] flex bg-white border-b-[6px] border-gray-300">
+        <div className="flex-[6.5] flex bg-white border-b-[6px] border-gray-300">
             {/* 좌측 도어 */}
-            <div className="w-[16%] border-r-2 border-gray-100 bg-blue-50/20 flex flex-col">
-                <div className="text-[9px] text-center text-gray-400 font-bold py-1 bg-gray-50 border-b">좌측 도어</div>
-                {renderItems(ZONES.FRIDGE_DOOR_LEFT)}
-            </div>
+            <div className="w-[18%] border-r-2 border-gray-100 bg-blue-50/10 flex flex-col">
+    {/* 제목 */}
+    <div className="text-[9px] text-center text-gray-400 font-bold py-1 bg-gray-50 border-b">좌측 도어</div>
+
+    {/* 2. 내부를 세로(flex-col)로 배치 */}
+    <div className="flex-1 flex flex-col">
+        
+        {/* (상) flex-1로 공간 차지 + 아래 선(border-b) 긋기 */}
+        <div className="flex-1 border-b border-gray-100">
+            {renderItems(ZONES.FRIDGE_DOOR_LEFT_1, '상')}
+        </div>
+
+        {/* (중) flex-1로 공간 차지 + 아래 선(border-b) 긋기 */}
+        <div className="flex-1 border-b border-gray-100">
+            {renderItems(ZONES.FRIDGE_DOOR_LEFT_2, '중')}
+        </div>
+
+        {/* (하) flex-1로 공간 차지 (마지막 칸은 선 없음) */}
+        <div className="flex-1">
+            {renderItems(ZONES.FRIDGE_DOOR_LEFT_3, '하')}
+        </div>
+
+    </div>
+</div>
 
             {/* 메인 공간 (중앙) */}
             <div className="flex-1 flex flex-col border-r-2 border-gray-100">
@@ -2573,10 +2639,24 @@ function FridgeMap({ ingredients, onItemClick }) {
             </div>
 
             {/* 우측 도어 */}
-            <div className="w-[16%] bg-blue-50/20 flex flex-col">
-                <div className="text-[9px] text-center text-gray-400 font-bold py-1 bg-gray-50 border-b">우측 도어</div>
-                {renderItems(ZONES.FRIDGE_DOOR_RIGHT)}
-            </div>
+            <div className="w-[18%] bg-blue-50/10 flex flex-col">
+    <div className="text-[9px] text-center text-gray-400 font-bold py-1 bg-gray-50 border-b">우측 도어</div>
+    
+    <div className="flex-1 flex flex-col">
+        {/* 상단 */}
+        <div className="flex-1 border-b border-gray-100">
+            {renderItems(ZONES.FRIDGE_DOOR_RIGHT_1, '상')}
+        </div>
+        {/* 중단 */}
+        <div className="flex-1 border-b border-gray-100">
+            {renderItems(ZONES.FRIDGE_DOOR_RIGHT_2, '중')}
+        </div>
+        {/* 하단 */}
+        <div className="flex-1">
+            {renderItems(ZONES.FRIDGE_DOOR_RIGHT_3, '하')}
+        </div>
+    </div>
+</div>
         </div>
 
         {/* 2️⃣ 하단: 냉동실 (40% 높이) */}
