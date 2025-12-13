@@ -1763,44 +1763,43 @@ function TrashView({ trashItems, onRestore, onPermanentDelete, onClose }) {
   );
 }
 
-// --- AddItemModal 전체 수정 ---
+// --- AddItemModal 전체 수정 (문법 오류 수정됨) ---
 function AddItemModal({ onClose, onAdd, initialDate }) {
   const [name, setName] = useState('');
   const [category, setCategory] = useState('fridge');
   const [expiry, setExpiry] = useState(
     initialDate 
       ? new Date(initialDate.getTime() - (initialDate.getTimezoneOffset() * 60000)).toISOString().split('T')[0] 
-      // 👇 [수정] 현재 시간(new Date())도 로컬 타임존 오프셋을 적용하여 한국 오전 시간대 오류 방지
       : new Date(Date.now() - (new Date().getTimezoneOffset() * 60000)).toISOString().split('T')[0]
   );
   const [price, setPrice] = useState('');
   const [amount, setAmount] = useState('');
   const [unit, setUnit] = useState('g');
   const [location, setLocation] = useState(ZONES.FRIDGE_MAIN_2);
+
   const setQuickExpiry = (days) => {
     const date = new Date();
     date.setDate(date.getDate() + days);
     setExpiry(date.toISOString().split('T')[0]);
   };
+
   const handleLocationChange = (newLoc) => {
     setLocation(newLoc);
-    // 🌟 [수정] 필터링 오류 해결을 위해 텍스트 포함 여부로 확실하게 카테고리 설정
     if (newLoc.includes('냉동')) setCategory('freezer');
     else if (newLoc.includes('실온') || newLoc.includes('팬트리')) setCategory('pantry');
-    else setCategory('fridge'); // 기본값 냉장
+    else setCategory('fridge'); 
   };
 
   const handleNameChange = (val) => {
     setName(val);
     const dbItem = SHELF_LIFE_DB[val] || SHELF_LIFE_DB[val.replace(/\s/g, '')];
     if (dbItem) {
-      // 자동 카테고리 결정
       let autoCat = 'fridge';
       if (dbItem.freezer && !dbItem.fridge) autoCat = 'freezer';
       else if (dbItem.pantry) autoCat = 'pantry';
       
       setCategory(autoCat);
-      setLocation(getRecommendedZone(val, autoCat)); // 신규 알고리즘 적용
+      setLocation(getRecommendedZone(val, autoCat)); 
 
       const days = dbItem.fridge || dbItem.freezer || dbItem.pantry || 7;
       const date = new Date();
@@ -1820,7 +1819,7 @@ function AddItemModal({ onClose, onAdd, initialDate }) {
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!name) return;
-    onAdd({ name, expiry: new Date(expiry), category, location, price: Number(price) || 0, amount: Number(amount) || 0, unit: unit }); // 👈 location 추가됨
+    onAdd({ name, expiry: new Date(expiry), category, location, price: Number(price) || 0, amount: Number(amount) || 0, unit: unit });
     onClose();
   };
 
@@ -1830,7 +1829,6 @@ function AddItemModal({ onClose, onAdd, initialDate }) {
         
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-xl font-bold text-gray-800">새 재료 추가</h2>
-          {/* bg-gray-700 앞에 dark: 접두사 추가 */}
           <button onClick={onClose} className="p-2 bg-gray-100 dark:bg-gray-700 rounded-full text-gray-500 hover:bg-gray-200 transition-colors">
             <X size={20} className="dark:text-white"/>
           </button>
@@ -1838,17 +1836,9 @@ function AddItemModal({ onClose, onAdd, initialDate }) {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1 ml-1">유통기한</label>
-            <input type="date" required value={expiry} onChange={(e) => setExpiry(e.target.value)} className="w-full p-3 bg-gray-50 dark:bg-gray-700 dark:text-white rounded-xl border border-gray-100 dark:border-gray-600 focus:border-green-500 outline-none font-medium mb-2" />
+            <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1 ml-1">제품명</label>
+            <input type="text" required autoFocus value={name} onChange={(e) => handleNameChange(e.target.value)} className="w-full p-4 bg-gray-50 dark:bg-gray-700 dark:text-white rounded-2xl text-lg font-bold border-2 border-transparent focus:border-green-500 focus:bg-white dark:focus:bg-gray-600 outline-none transition-all placeholder:font-normal" placeholder="예: 우유, 두부" />
           </div>
-
-        <div className="flex flex-wrap gap-2">
-            <button type="button" onClick={() => setQuickExpiry(3)} className="px-3 py-1.5 bg-red-50 text-red-500 rounded-lg text-xs font-bold border border-red-100 hover:bg-red-100">🥩 고기(3일)</button>
-            <button type="button" onClick={() => setQuickExpiry(7)} className="px-3 py-1.5 bg-green-50 text-green-600 rounded-lg text-xs font-bold border border-green-100 hover:bg-green-100">🥦 야채(7일)</button>
-            <button type="button" onClick={() => setQuickExpiry(14)} className="px-3 py-1.5 bg-yellow-50 text-yellow-600 rounded-lg text-xs font-bold border border-yellow-100 hover:bg-yellow-100">🥛 유제품(2주)</button>
-            <button type="button" onClick={() => setQuickExpiry(30)} className="px-3 py-1.5 bg-blue-50 text-blue-600 rounded-lg text-xs font-bold border border-blue-100 hover:bg-blue-100">❄️ 냉동(1달)</button>
-          </div>
-        </div>
 
           <div className="flex gap-2">
             {['fridge', 'freezer', 'pantry'].map(cat => (
@@ -1858,30 +1848,14 @@ function AddItemModal({ onClose, onAdd, initialDate }) {
             ))}
           </div>
 
-          {/* 👇 위치 선택 드롭다운 추가 */}
           <div>
             <label className="block text-xs font-bold text-gray-500 mb-1 ml-1">상세 위치 설정</label>
             <select value={location} onChange={(e)=>handleLocationChange(e.target.value)} className="w-full p-3 bg-gray-50 rounded-xl border border-gray-100 outline-none text-sm font-bold">
                 <optgroup label="🧊 냉장실">
-                    <option value={ZONES.FRIDGE_MAIN_1}>{ZONES.FRIDGE_MAIN_1}</option>
-                    <option value={ZONES.FRIDGE_MAIN_2}>{ZONES.FRIDGE_MAIN_2}</option>
-                    <option value={ZONES.FRIDGE_MAIN_3}>{ZONES.FRIDGE_MAIN_3}</option>
-                    <option value={ZONES.FRIDGE_FRESH_1}>{ZONES.FRIDGE_FRESH_1}</option>
-                    <option value={ZONES.FRIDGE_FRESH_2}>{ZONES.FRIDGE_FRESH_2}</option>
-                    <option value={ZONES.FRIDGE_MULTI_1}>{ZONES.FRIDGE_MULTI_1}</option>
-                    <option value={ZONES.FRIDGE_MULTI_2}>{ZONES.FRIDGE_MULTI_2}</option>
-                    <option value={ZONES.FRIDGE_DOOR_LEFT}>{ZONES.FRIDGE_DOOR_LEFT}</option>
-                    <option value={ZONES.FRIDGE_DOOR_RIGHT}>{ZONES.FRIDGE_DOOR_RIGHT}</option>
+                    {Object.values(ZONES).filter(z => z.includes('냉장')).map(z => <option key={z} value={z}>{z}</option>)}
                 </optgroup>
                 <optgroup label="❄️ 냉동실">
-                    <option value={ZONES.FREEZER_LEFT_DOOR}>{ZONES.FREEZER_LEFT_DOOR}</option>
-                    <option value={ZONES.FREEZER_RIGHT_DOOR}>{ZONES.FREEZER_RIGHT_DOOR}</option>
-                    <option value={ZONES.FREEZER_LEFT_1}>{ZONES.FREEZER_LEFT_1}</option>
-                    <option value={ZONES.FREEZER_LEFT_2}>{ZONES.FREEZER_LEFT_2}</option>
-                    <option value={ZONES.FREEZER_LEFT_3}>{ZONES.FREEZER_LEFT_3}</option>
-                    <option value={ZONES.FREEZER_RIGHT_1}>{ZONES.FREEZER_RIGHT_1}</option>
-                    <option value={ZONES.FREEZER_RIGHT_2}>{ZONES.FREEZER_RIGHT_2}</option>
-                    <option value={ZONES.FREEZER_RIGHT_3}>{ZONES.FREEZER_RIGHT_3}</option>
+                    {Object.values(ZONES).filter(z => z.includes('냉동')).map(z => <option key={z} value={z}>{z}</option>)}
                 </optgroup>
                 <optgroup label="🏠 기타">
                     <option value={ZONES.PANTRY}>{ZONES.PANTRY}</option>
@@ -1912,7 +1886,14 @@ function AddItemModal({ onClose, onAdd, initialDate }) {
 
           <div>
             <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1 ml-1">유통기한</label>
-            <input type="date" required value={expiry} onChange={(e) => setExpiry(e.target.value)} className="w-full p-3 bg-gray-50 dark:bg-gray-700 dark:text-white rounded-xl border border-gray-100 dark:border-gray-600 focus:border-green-500 outline-none font-medium" />
+            <input type="date" required value={expiry} onChange={(e) => setExpiry(e.target.value)} className="w-full p-3 bg-gray-50 dark:bg-gray-700 dark:text-white rounded-xl border border-gray-100 dark:border-gray-600 focus:border-green-500 outline-none font-medium mb-2" />
+            {/* 👇 빠른 설정 버튼 */}
+            <div className="flex flex-wrap gap-2">
+                <button type="button" onClick={() => setQuickExpiry(3)} className="px-3 py-1.5 bg-red-50 text-red-500 rounded-lg text-xs font-bold border border-red-100 hover:bg-red-100">🥩 고기(3일)</button>
+                <button type="button" onClick={() => setQuickExpiry(7)} className="px-3 py-1.5 bg-green-50 text-green-600 rounded-lg text-xs font-bold border border-green-100 hover:bg-green-100">🥦 야채(7일)</button>
+                <button type="button" onClick={() => setQuickExpiry(14)} className="px-3 py-1.5 bg-yellow-50 text-yellow-600 rounded-lg text-xs font-bold border border-yellow-100 hover:bg-yellow-100">🥛 유제품(2주)</button>
+                <button type="button" onClick={() => setQuickExpiry(30)} className="px-3 py-1.5 bg-blue-50 text-blue-600 rounded-lg text-xs font-bold border border-blue-100 hover:bg-blue-100">❄️ 냉동(1달)</button>
+            </div>
           </div>
 
           <button type="submit" className="w-full bg-green-600 text-white py-4 rounded-2xl font-bold text-lg shadow-lg hover:bg-green-700 active:scale-95 transition-all mt-4 flex items-center justify-center gap-2">
