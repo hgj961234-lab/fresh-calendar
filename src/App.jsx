@@ -214,11 +214,12 @@ const ZONES = {
   FRIDGE_DOOR_RIGHT_1: '🚪 냉장실: 우측 도어 (상)',
   FRIDGE_DOOR_RIGHT_2: '🚪 냉장실: 우측 도어 (중)',
   FRIDGE_DOOR_RIGHT_3: '🚪 냉장실: 우측 도어 (하)',
-  FREEZER_LEFT_DOOR_1: '❄️ 냉동실: 좌측 도어 (상)', // 👈 [추가]
-  FREEZER_LEFT_DOOR_2: '❄️ 냉동실: 좌측 도어 (하)', // 👈 [추가]
-  FREEZER_RIGHT_DOOR_1: '❄️ 냉동실: 우측 도어 (상)', // 👈 [추가]
-  FREEZER_RIGHT_DOOR_2: '❄️ 냉동실: 우측 도어 (하)', // 👈 [추가]
-  FREEZER_LEFT_1: '❄️ 냉동실: 좌측 서랍 (상)',
+  FREEZER_LEFT_DOOR_1: '❄️ 냉동실: 좌측 도어 (상)',
+  FREEZER_LEFT_DOOR_2: '❄️ 냉동실: 좌측 도어 (중)',
+  FREEZER_LEFT_DOOR_3: '❄️ 냉동실: 좌측 도어 (하)',
+  FREEZER_RIGHT_DOOR_1: '❄️ 냉동실: 우측 도어 (상)',
+  FREEZER_RIGHT_DOOR_2: '❄️ 냉동실: 우측 도어 (중)',
+  FREEZER_RIGHT_DOOR_3: '❄️ 냉동실: 우측 도어 (하)',
   FREEZER_LEFT_1: '❄️ 냉동실: 좌측 서랍 (상)',
   FREEZER_LEFT_2: '❄️ 냉동실: 좌측 서랍 (중)',
   FREEZER_LEFT_3: '❄️ 냉동실: 좌측 서랍 (하)',
@@ -1565,12 +1566,14 @@ function AppContent({ user }) {
         const items = snap.docs.map(d => ({ ...d.data(), id: d.id, date: d.data().date?.toDate() }));
         setHistoryItems(items);
     });
-    const handleGoToTheory = (theoryId) => {
+    
+    return () => { unsubIng(); unsubCart(); unsubTrash(); unsubHistory(); };
+  }, [user]);
+
+  const handleGoToTheory = (theoryId) => {
         setSelectedTheoryId(theoryId);
         setActiveTab('theory');
   };
-    return () => { unsubIng(); unsubCart(); unsubTrash(); unsubHistory(); };
-  }, [user]);
 
   // 2. 알림 기능 (복구됨)
   const requestNotificationPermission = () => {
@@ -3163,11 +3166,14 @@ function FridgeMap({ ingredients, onItemClick }) {
         <div className="flex-[4.5] flex bg-blue-100/10">
             {/* 좌측 냉동 */}
             <div className="flex-1 flex border-r-4 border-gray-300">
+                {/* 🌟 [수정] 좌측 도어 3단 분할 적용 */}
                 <div className="w-[25%] border-r border-blue-100 bg-blue-50/30 flex flex-col">
                      <div className="flex-1 border-b border-blue-100">{renderItems(ZONES.FREEZER_LEFT_DOOR_1, '도어(상)')}</div>
-                     <div className="flex-1">{renderItems(ZONES.FREEZER_LEFT_DOOR_2, '도어(하)')}</div>
+                     <div className="flex-1 border-b border-blue-100">{renderItems(ZONES.FREEZER_LEFT_DOOR_2, '도어(중)')}</div>
+                     <div className="flex-1">{renderItems(ZONES.FREEZER_LEFT_DOOR_3, '도어(하)')}</div>
                 </div>
-                {/* 🌟 서랍 3단 분할 코드 (테두리 점선으로 구분) */}
+                
+                {/* 서랍 부분 (기존 유지) */}
                 <div className="flex-1 flex flex-col">
                     <div className="flex-1 border-b-2 border-dashed border-blue-200">{renderItems(ZONES.FREEZER_LEFT_1, '서랍 1 (상)')}</div>
                     <div className="flex-1 border-b-2 border-dashed border-blue-200">{renderItems(ZONES.FREEZER_LEFT_2, '서랍 2 (중)')}</div>
@@ -3177,20 +3183,21 @@ function FridgeMap({ ingredients, onItemClick }) {
 
             {/* 우측 냉동 */}
             <div className="flex-1 flex">
-                 {/* 🌟 서랍 3단 분할 코드 */}
+                 {/* 서랍 부분 (기존 유지) */}
                  <div className="flex-1 flex flex-col border-r border-blue-100">
                     <div className="flex-1 border-b-2 border-dashed border-blue-200">{renderItems(ZONES.FREEZER_RIGHT_1, '서랍 1 (상)')}</div>
                     <div className="flex-1 border-b-2 border-dashed border-blue-200">{renderItems(ZONES.FREEZER_RIGHT_2, '서랍 2 (중)')}</div>
                     <div className="flex-1">{renderItems(ZONES.FREEZER_RIGHT_3, '서랍 3 (하)')}</div>
                 </div>
+                {/* 🌟 [수정] 우측 도어 3단 분할 적용 */}
                 <div className="w-[25%] bg-blue-50/30 flex flex-col">
                      <div className="flex-1 border-b border-blue-100">{renderItems(ZONES.FREEZER_RIGHT_DOOR_1, '도어(상)')}</div>
-                     <div className="flex-1">{renderItems(ZONES.FREEZER_RIGHT_DOOR_2, '도어(하)')}</div>
+                     <div className="flex-1 border-b border-blue-100">{renderItems(ZONES.FREEZER_RIGHT_DOOR_2, '도어(중)')}</div>
+                     <div className="flex-1">{renderItems(ZONES.FREEZER_RIGHT_DOOR_3, '도어(하)')}</div>
                 </div>
             </div>
-        </div>
-      </div>
-      
+          </div> {/* 👈 [복구] 냉동실 전체 구역 닫기 */}
+        </div> {/* 👈 [복구] 냉장고 전체 프레임 닫기 */}    
       {/* 3️⃣ 실온 / 팬트리 (기존 유지) */}
       <div className="mt-4 bg-orange-50 border-2 border-dashed border-orange-200 rounded-xl p-3 min-h-[100px]">
           <h3 className="text-xs font-bold text-orange-600 mb-2">🏠 실온 보관 / 팬트리</h3>
@@ -3201,4 +3208,3 @@ function FridgeMap({ ingredients, onItemClick }) {
     </div>
   );
 }
-       
