@@ -1763,7 +1763,7 @@ function TrashView({ trashItems, onRestore, onPermanentDelete, onClose }) {
   );
 }
 
-// --- AddItemModal 전체 수정 (문법 오류 수정됨) ---
+// [수정된 AddItemModal] 카테고리 변경 시 유통기한/위치 자동 갱신 기능 추가
 function AddItemModal({ onClose, onAdd, initialDate }) {
   const [name, setName] = useState('');
   const [category, setCategory] = useState('fridge');
@@ -1783,6 +1783,40 @@ function AddItemModal({ onClose, onAdd, initialDate }) {
     setExpiry(date.toISOString().split('T')[0]);
   };
 
+  // 🌟 [신규] 카테고리 버튼 클릭 시 -> 위치 & 유통기한 재계산 로직
+  const handleCategoryChange = (newCat) => {
+    setCategory(newCat); // 1. 카테고리 상태 변경
+
+    // 2. 현재 입력된 이름으로 DB 정보 조회
+    const n = name.trim();
+    const dbItem = SHELF_LIFE_DB[n] || SHELF_LIFE_DB[n.replace(/\s/g, '')];
+
+    // 3. 위치 자동 변경 (이름이 없어도 해당 카테고리의 기본 위치로 이동)
+    const newLocation = getRecommendedZone(n, newCat);
+    setLocation(newLocation);
+
+    // 4. 유통기한 자동 변경 (DB에 정보가 있는 경우)
+    if (dbItem) {
+        let days = 7; // 기본값
+        
+        // 선택한 카테고리에 맞는 일수 가져오기
+        if (newCat === 'fridge') {
+            days = dbItem.fridge || 7; 
+        } else if (newCat === 'freezer') {
+            // 냉동 데이터가 없으면 기본 30일, 있으면 DB값 사용
+            days = dbItem.freezer || 30; 
+        } else if (newCat === 'pantry') {
+            days = dbItem.pantry || 30;
+        }
+
+        // 날짜 계산 및 적용
+        const date = new Date();
+        date.setDate(date.getDate() + days);
+        setExpiry(date.toISOString().split('T')[0]);
+    }
+  };
+
+  // 상세 위치 드롭다운 변경 시 (기존 로직 유지)
   const handleLocationChange = (newLoc) => {
     setLocation(newLoc);
     if (newLoc.includes('냉동')) setCategory('freezer');
@@ -1790,18 +1824,21 @@ function AddItemModal({ onClose, onAdd, initialDate }) {
     else setCategory('fridge'); 
   };
 
+  // 이름 입력 시 (기존 로직 유지)
   const handleNameChange = (val) => {
     setName(val);
     const dbItem = SHELF_LIFE_DB[val] || SHELF_LIFE_DB[val.replace(/\s/g, '')];
     if (dbItem) {
       let autoCat = 'fridge';
+      // DB 우선순위에 따라 초기 카테고리 설정
       if (dbItem.freezer && !dbItem.fridge) autoCat = 'freezer';
       else if (dbItem.pantry) autoCat = 'pantry';
       
       setCategory(autoCat);
       setLocation(getRecommendedZone(val, autoCat)); 
 
-      const days = dbItem.fridge || dbItem.freezer || dbItem.pantry || 7;
+      // 해당 카테고리의 유통기한 적용
+      const days = dbItem[autoCat] || 7; 
       const date = new Date();
       date.setDate(date.getDate() + days);
       setExpiry(date.toISOString().split('T')[0]);
@@ -1842,7 +1879,8 @@ function AddItemModal({ onClose, onAdd, initialDate }) {
 
           <div className="flex gap-2">
             {['fridge', 'freezer', 'pantry'].map(cat => (
-              <button key={cat} type="button" onClick={() => setCategory(cat)} className={`flex-1 py-3 rounded-xl text-sm font-bold transition-all ${category === cat ? 'bg-gray-800 dark:bg-green-600 text-white shadow-lg scale-105' : 'bg-gray-100 dark:bg-gray-700 text-gray-400 hover:bg-gray-200'}`}>
+              // 🌟 [수정] onClick에 setCategory 대신 handleCategoryChange 연결
+              <button key={cat} type="button" onClick={() => handleCategoryChange(cat)} className={`flex-1 py-3 rounded-xl text-sm font-bold transition-all ${category === cat ? 'bg-gray-800 dark:bg-green-600 text-white shadow-lg scale-105' : 'bg-gray-100 dark:bg-gray-700 text-gray-400 hover:bg-gray-200'}`}>
                 {cat === 'fridge' ? '냉장' : cat === 'freezer' ? '냉동' : '실온'}
               </button>
             ))}
@@ -1887,7 +1925,6 @@ function AddItemModal({ onClose, onAdd, initialDate }) {
           <div>
             <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1 ml-1">유통기한</label>
             <input type="date" required value={expiry} onChange={(e) => setExpiry(e.target.value)} className="w-full p-3 bg-gray-50 dark:bg-gray-700 dark:text-white rounded-xl border border-gray-100 dark:border-gray-600 focus:border-green-500 outline-none font-medium mb-2" />
-            {/* 👇 빠른 설정 버튼 */}
             <div className="flex flex-wrap gap-2">
                 <button type="button" onClick={() => setQuickExpiry(3)} className="px-3 py-1.5 bg-red-50 text-red-500 rounded-lg text-xs font-bold border border-red-100 hover:bg-red-100">🥩 고기(3일)</button>
                 <button type="button" onClick={() => setQuickExpiry(7)} className="px-3 py-1.5 bg-green-50 text-green-600 rounded-lg text-xs font-bold border border-green-100 hover:bg-green-100">🥦 야채(7일)</button>
@@ -2097,12 +2134,15 @@ function ShoppingCartView({ cart, ingredients, onUpdateCount, onRemove, onChecko
   );
 }
 
-// --- RecipeView: 냉장고 털기 필터 & 임박 재료 추천 기능 탑재 ---
+// --- RecipeView: 카테고리별 보기 기능 추가됨 ---
 function RecipeView({ ingredients, onAddToCart, recipes, user }) {
-  const [activeTab, setActiveTab] = useState('default'); 
+  const [activeTab, setActiveTab] = useState('default'); // 'default'(추천), 'category', 'my'
   const [myRecipes, setMyRecipes] = useState([]);
   
-  // 🟢 [New] 냉파 필터 상태
+  // 🟢 [New] 카테고리 선택 상태
+  const [selectedCategory, setSelectedCategory] = useState(null);
+
+  // 냉파 필터 상태
   const [isFridgeClearingMode, setIsFridgeClearingMode] = useState(false);
 
   // 리스트 필터링용 상태
@@ -2125,10 +2165,9 @@ function RecipeView({ ingredients, onAddToCart, recipes, user }) {
     return () => unsub();
   }, [user]);
 
-  // 2. 레시피 열 때 '없는 재료'만 자동으로 선택 (스마트 체크)
+  // 2. 레시피 열 때 '없는 재료'만 자동으로 선택
   useEffect(() => {
     if (selectedRecipe) {
-        // 내가 없는 재료만 true (구매 목록)
         const missing = selectedRecipe.ingredients.filter(ing => 
             !ingredients.some(myIng => matchIngredient(ing, myIng.name))
         );
@@ -2136,7 +2175,6 @@ function RecipeView({ ingredients, onAddToCart, recipes, user }) {
     }
   }, [selectedRecipe, ingredients]);
 
-  // 3. 재료명 매칭 헬퍼
   const matchIngredient = (r, u) => { 
       const rr = r.replace(/\s/g,'');
       const uu = u.replace(/\s/g,''); 
@@ -2144,19 +2182,16 @@ function RecipeView({ ingredients, onAddToCart, recipes, user }) {
       return rr.includes(uu) || uu.includes(rr); 
   };
 
-  // 4. 유통기한 임박도 계산 (3일 이내면 점수 높음)
   const getIngredientUrgency = (ingName) => {
     const matchedItems = ingredients.filter(i => matchIngredient(ingName, i.name));
     if (matchedItems.length === 0) return 0;
-    
-    // 하나라도 유통기한이 3일 이내라면 긴급(Danger)
     const hasDanger = matchedItems.some(i => {
        const today = new Date(); today.setHours(0,0,0,0);
        const exp = new Date(i.expiry); exp.setHours(0,0,0,0);
        const diff = Math.ceil((exp - today) / (1000 * 60 * 60 * 24));
        return diff >= 0 && diff <= 3;
     });
-    return hasDanger ? 100 : 1; // 임박 재료는 가중치 100점 부여 (무조건 상단 노출)
+    return hasDanger ? 100 : 1; 
   };
 
   const toggleIngredientToBuy = (ingName) => {
@@ -2237,17 +2272,41 @@ function RecipeView({ ingredients, onAddToCart, recipes, user }) {
     } catch(e) { toast.error('저장 실패'); }
   };
 
-  // 🟢 [Logic] 레시피 정렬 및 필터링 핵심 로직
-  const allRecipes = activeTab === 'default' ? recipes : myRecipes;
+  const deleteMyRecipe = async (id) => {
+    if (!confirm("정말 이 레시피를 삭제하시겠습니까?")) return;
+    try {
+        await deleteDoc(doc(db, `users/${user.uid}/recipes`, id));
+        toast.success("레시피가 삭제되었습니다.");
+        if (selectedRecipe && selectedRecipe.id === id) {
+            setSelectedRecipe(null); 
+        }
+    } catch (e) {
+        toast.error("삭제 실패: " + e.message);
+    }
+  };
+
+  // 🟢 [Logic] 탭에 따른 레시피 소스 선택
+  let targetRecipes = [];
+  if (activeTab === 'my') {
+      targetRecipes = myRecipes;
+  } else if (activeTab === 'category') {
+      // 카테고리 탭에서는 선택된 카테고리가 있을 때만 필터링
+      if (selectedCategory) {
+          targetRecipes = recipes.filter(r => r.category === selectedCategory);
+      } else {
+          targetRecipes = []; // 선택 전에는 리스트 안 보여줌 (메뉴판 보여줌)
+      }
+  } else {
+      // default (추천)
+      targetRecipes = recipes;
+  }
   
-  let matchedRecipes = allRecipes.map(recipe => {
-      // 보유 재료 확인
+  // 🟢 [Logic] 매칭 점수 계산 및 정렬
+  let matchedRecipes = targetRecipes.map(recipe => {
       const existing = recipe.ingredients.filter(req => selectedIngredients.some(sel => matchIngredient(req, sel)));
       const missing = recipe.ingredients.filter(req => !selectedIngredients.some(sel => matchIngredient(req, sel)));
       
-      // 긴급 점수 계산 (임박 재료 포함 시 점수 폭발적 증가)
       let urgencyScore = 0;
-      // 내가 가진 재료들 중에서, 이 레시피에 쓰이는 것들의 긴급도 합산
       ingredients.forEach(myIng => {
           if (recipe.ingredients.some(req => matchIngredient(req, myIng.name))) {
               urgencyScore += getIngredientUrgency(myIng.name);
@@ -2257,13 +2316,16 @@ function RecipeView({ ingredients, onAddToCart, recipes, user }) {
       return { ...recipe, existing, missing, urgencyScore, score: existing.length + urgencyScore };
   });
 
-  // 냉파 필터가 켜져있으면, 유통기한 임박 재료(100점 이상)가 포함된 레시피만 남김
   if (isFridgeClearingMode) {
       matchedRecipes = matchedRecipes.filter(r => r.urgencyScore >= 100);
   }
 
-  // 정렬: 점수 높은 순 (임박 재료 포함 > 보유 재료 많음)
-  matchedRecipes.sort((a, b) => b.score - a.score);
+  // 정렬 (내 레시피는 최신순, 나머지는 점수순)
+  if (activeTab === 'my') {
+      // DB에서 가져온 순서(보통 추가순) 그대로 두거나 이름순 정렬
+  } else {
+      matchedRecipes.sort((a, b) => b.score - a.score);
+  }
 
   const toggleSelection = (name) => { if (selectedIngredients.includes(name)) setSelectedIngredients(selectedIngredients.filter(i => i !== name)); else setSelectedIngredients([...selectedIngredients, name]); };
   const toggleSelectAll = () => { if (selectedIngredients.length === ingredients.length && ingredients.length > 0) setSelectedIngredients([]); else setSelectedIngredients(ingredients.map(i => i.name)); };
@@ -2280,8 +2342,8 @@ function RecipeView({ ingredients, onAddToCart, recipes, user }) {
            </div>
            <div className="flex-1 flex items-center justify-center p-8 text-center">
               <div className="max-w-2xl">
-                 <span className="inline-block bg-green-600 text-2xl font-bold rounded-full w-16 h-16 flex items-center justify-center mb-6 mx-auto shadow-lg shadow-green-900/50">{currentStep + 1}</span>
-                 <p className="text-2xl md:text-4xl font-bold leading-relaxed whitespace-pre-wrap">{scaledSteps[currentStep]}</p>
+                  <span className="inline-block bg-green-600 text-2xl font-bold rounded-full w-16 h-16 flex items-center justify-center mb-6 mx-auto shadow-lg shadow-green-900/50">{currentStep + 1}</span>
+                  <p className="text-2xl md:text-4xl font-bold leading-relaxed whitespace-pre-wrap">{scaledSteps[currentStep]}</p>
               </div>
            </div>
            <div className="p-8 pb-10 flex justify-between items-center bg-gray-800">
@@ -2296,11 +2358,17 @@ function RecipeView({ ingredients, onAddToCart, recipes, user }) {
   if (selectedRecipe) {
   return (
     <div className="p-4 pb-24 h-full bg-white flex flex-col overflow-y-auto">
-      {/* 👇 sticky 제거하여 스크롤 시 자연스럽게 올라감 */}
       <div className="bg-white pb-4 border-b mb-4">
-        <button onClick={() => { setSelectedRecipe(null); setServings(1); }} className="text-gray-500 flex items-center gap-2 mb-2 hover:text-green-600 font-bold">
-                   <ArrowLeft size={20}/> 목록으로 돌아가기
-               </button>
+        <div className="flex justify-between items-start mb-2">
+            <button onClick={() => { setSelectedRecipe(null); setServings(1); }} className="text-gray-500 flex items-center gap-2 hover:text-green-600 font-bold">
+                <ArrowLeft size={20}/> 목록으로 돌아가기
+            </button>
+            {selectedRecipe.category === 'My' && (
+                <button onClick={() => deleteMyRecipe(selectedRecipe.id)} className="text-red-500 bg-red-50 px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1 hover:bg-red-100 transition-colors">
+                    <Trash2 size={14}/> 삭제하기
+                </button>
+            )}
+        </div>
                <div className="flex justify-between items-end">
                   <h2 className="text-3xl font-bold text-gray-800">{selectedRecipe.name}</h2>
                   <button onClick={toggleCookingMode} className="bg-green-600 text-white px-4 py-2 rounded-xl font-bold text-sm shadow-md hover:bg-green-700 flex items-center gap-2 animate-pulse">
@@ -2312,7 +2380,7 @@ function RecipeView({ ingredients, onAddToCart, recipes, user }) {
                    <span className="bg-gray-100 text-gray-600 text-xs px-2 py-1 rounded-full">재료 {selectedRecipe.ingredients.length}개</span>
                </div>
             </div>
-            
+           
             <div className="bg-green-50 p-4 rounded-2xl mb-6 border border-green-100 flex items-center justify-between">
                <span className="font-bold text-green-800 flex items-center gap-2"><Users size={18}/> 기준 인원</span>
                <div className="flex items-center bg-white rounded-lg shadow-sm">
@@ -2345,7 +2413,6 @@ function RecipeView({ ingredients, onAddToCart, recipes, user }) {
                         );
                     })}
                 </div>
-                <p className="text-[10px] text-gray-400 mt-2 ml-1 text-right">* 파란색 테두리가 장바구니에 담길 재료입니다.</p>
             </div>
 
             <div className="mb-8">
@@ -2373,7 +2440,6 @@ function RecipeView({ ingredients, onAddToCart, recipes, user }) {
         <div className="flex justify-between items-center mb-6">
             <h2 className="text-xl font-bold">오늘 뭐 먹지?</h2>
             <div className="flex gap-2">
-                {/* 🟢 [New] 냉장고 털기 필터 버튼 */}
                 <button 
                     onClick={() => setIsFridgeClearingMode(!isFridgeClearingMode)} 
                     className={`px-3 py-1.5 text-xs font-bold rounded-lg border transition-all flex items-center gap-1 ${isFridgeClearingMode ? 'bg-red-100 text-red-600 border-red-200' : 'bg-white text-gray-500 border-gray-200'}`}
@@ -2381,7 +2447,9 @@ function RecipeView({ ingredients, onAddToCart, recipes, user }) {
                     <AlertCircle size={14} /> 냉장고 털기 {isFridgeClearingMode ? 'ON' : 'OFF'}
                 </button>
                 <div className="flex bg-gray-100 rounded-lg p-1">
-                    <button onClick={() => setActiveTab('default')} className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${activeTab === 'default' ? 'bg-white shadow-sm text-green-600' : 'text-gray-400'}`}>추천</button>
+                    {/* 🟢 [Changed] 탭 버튼 3개로 확장 */}
+                    <button onClick={() => { setActiveTab('default'); setSelectedCategory(null); }} className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${activeTab === 'default' ? 'bg-white shadow-sm text-green-600' : 'text-gray-400'}`}>추천</button>
+                    <button onClick={() => { setActiveTab('category'); setSelectedCategory(null); }} className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${activeTab === 'category' ? 'bg-white shadow-sm text-green-600' : 'text-gray-400'}`}>카테고리</button>
                     <button onClick={() => setActiveTab('my')} className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${activeTab === 'my' ? 'bg-white shadow-sm text-green-600' : 'text-gray-400'}`}>MY</button>
                 </div>
             </div>
@@ -2407,30 +2475,64 @@ function RecipeView({ ingredients, onAddToCart, recipes, user }) {
             </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto space-y-3">
-            {matchedRecipes.length > 0 ? matchedRecipes.map((recipe, idx) => (
-                <div key={idx} onClick={() => setSelectedRecipe(recipe)} className={`bg-white p-4 rounded-xl border shadow-sm hover:border-green-400 cursor-pointer transition-all ${recipe.urgencyScore >= 100 ? 'border-red-200 bg-red-50/30' : 'border-gray-100'}`}>
-                    <div className="flex justify-between items-start">
-                        <h3 className="font-bold text-gray-800 flex items-center gap-2">
-                            {recipe.name}
-                            {/* 🔥 임박 재료 뱃지 */}
-                            {recipe.urgencyScore >= 100 && <span className="text-[9px] bg-red-500 text-white px-1.5 py-0.5 rounded-full animate-pulse">임박재료!</span>}
-                        </h3>
-                        <div className="flex gap-1">
-                           {recipe.score > 0 && <span className="text-[10px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded font-bold">{recipe.existing.length}개 일치</span>}
+        {/* 🟢 [New] 카테고리 선택 화면 (카테고리 탭이고, 아직 선택 안했을 때) */}
+        {activeTab === 'category' && !selectedCategory && (
+            <div className="grid grid-cols-2 gap-3 mb-4">
+                {['Korean', 'Japanese', 'Chinese', 'Italian', 'Other'].map(cat => (
+                    <button key={cat} onClick={() => setSelectedCategory(cat)} className="h-24 bg-white border border-gray-200 rounded-2xl shadow-sm hover:border-green-500 hover:bg-green-50 transition-all flex flex-col items-center justify-center gap-2 group">
+                        <span className="text-3xl group-hover:scale-110 transition-transform">
+                            {cat === 'Korean' ? '🥘' : cat === 'Japanese' ? '🍣' : cat === 'Chinese' ? '🥟' : cat === 'Italian' ? '🍝' : '🍔'}
+                        </span>
+                        <span className="font-bold text-gray-700 group-hover:text-green-700">
+                            {cat === 'Korean' ? '한식' : cat === 'Japanese' ? '일식' : cat === 'Chinese' ? '중식' : cat === 'Italian' ? '양식' : '기타'}
+                        </span>
+                    </button>
+                ))}
+            </div>
+        )}
+
+        {/* 🟢 [New] 카테고리 상세 목록 헤더 (뒤로가기) */}
+        {activeTab === 'category' && selectedCategory && (
+            <div className="flex items-center gap-2 mb-4">
+                <button onClick={() => setSelectedCategory(null)} className="p-2 hover:bg-gray-100 rounded-full"><ArrowLeft size={18} className="text-gray-500"/></button>
+                <h3 className="font-bold text-lg text-green-700">
+                    {selectedCategory === 'Korean' ? '🥘 한식' : selectedCategory === 'Japanese' ? '🍣 일식' : selectedCategory === 'Chinese' ? '🥟 중식' : selectedCategory === 'Italian' ? '🍝 양식' : '🍔 기타'} 모음
+                </h3>
+            </div>
+        )}
+
+        {/* 레시피 리스트 (카테고리 탭일 땐 선택된 경우에만 표시) */}
+        {(activeTab !== 'category' || selectedCategory) && (
+            <div className="flex-1 overflow-y-auto space-y-3">
+                {matchedRecipes.length > 0 ? matchedRecipes.map((recipe, idx) => (
+                    <div key={idx} onClick={() => setSelectedRecipe(recipe)} className={`bg-white p-4 rounded-xl border shadow-sm hover:border-green-400 cursor-pointer transition-all ${recipe.urgencyScore >= 100 ? 'border-red-200 bg-red-50/30' : 'border-gray-100'}`}>
+                        <div className="flex justify-between items-start">
+                            <h3 className="font-bold text-gray-800 flex items-center gap-2">
+                                {recipe.name}
+                                {recipe.urgencyScore >= 100 && <span className="text-[9px] bg-red-500 text-white px-1.5 py-0.5 rounded-full animate-pulse">임박재료!</span>}
+                            </h3>
+                            <div className="flex gap-1 items-center">
+                               {/* 🌟 목록 화면 삭제 버튼 (내 레시피일 때만 표시) */}
+                               {recipe.category === 'My' && (
+                                    <button onClick={(e) => { e.stopPropagation(); deleteMyRecipe(recipe.id); }} className="text-gray-400 hover:text-red-500 p-1 rounded-full hover:bg-red-50 transition-colors">
+                                        <Trash2 size={14}/>
+                                    </button>
+                               )}
+                               {recipe.score > 0 && <span className="text-[10px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded font-bold">{recipe.existing.length}개 일치</span>}
+                            </div>
                         </div>
+                        <p className="text-xs text-gray-400 mt-1 truncate">{recipe.measure}</p>
                     </div>
-                    <p className="text-xs text-gray-400 mt-1 truncate">{recipe.measure}</p>
-                </div>
-            )) : (
-                <div className="text-center py-20 text-gray-400">
-                    {isFridgeClearingMode ? 
-                        <><AlertCircle className="mx-auto mb-2 text-gray-300"/>임박한 재료로 만들 수 있는<br/>레시피가 없어요 🥲</> : 
-                        "등록된 레시피가 없습니다."
-                    }
-                </div>
-            )}
-        </div>
+                )) : (
+                    <div className="text-center py-20 text-gray-400">
+                        {isFridgeClearingMode ? 
+                            <><AlertCircle className="mx-auto mb-2 text-gray-300"/>임박한 재료로 만들 수 있는<br/>레시피가 없어요 🥲</> : 
+                            "등록된 레시피가 없습니다."
+                        }
+                    </div>
+                )}
+            </div>
+        )}
       </div>
   );
 }
