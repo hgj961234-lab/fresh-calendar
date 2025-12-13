@@ -1847,6 +1847,10 @@ function AppContent({ user }) {
             <NavBtn active={activeTab==='list'} onClick={()=>setActiveTab('list')} icon={<Refrigerator />} label="냉장고" />
             <NavBtn active={activeTab==='cart'} onClick={()=>setActiveTab('cart')} icon={<ShoppingCart />} label="카트" count={cart.reduce((sum, item) => sum + item.count, 0)} />
             <NavBtn active={activeTab==='recipes'} onClick={()=>setActiveTab('recipes')} icon={<ChefHat />} label="레시피" />
+            
+            {/* 👇 [추가] 요리과학 버튼 (책 아이콘) */}
+            <NavBtn active={activeTab==='theory'} onClick={()=>setActiveTab('theory')} icon={<BookOpen />} label="과학" />
+            
             <NavBtn active={activeTab==='stats'} onClick={()=>setActiveTab('stats')} icon={<BarChart2 />} label="통계" />
           </nav>
         </div>
@@ -2700,35 +2704,39 @@ function RecipeView({ ingredients, onAddToCart, recipes, user, onNavigateToTheor
             )}
         </div>
                <div className="flex justify-between items-end">
-                  <h2 className="text-3xl font-bold text-gray-800">{selectedRecipe.name}</h2>
-                  <button onClick={toggleCookingMode} className="bg-green-600 text-white px-4 py-2 rounded-xl font-bold text-sm shadow-md hover:bg-green-700 flex items-center gap-2 animate-pulse">
-                      <MonitorPlay size={18}/> 요리 시작
-                  </button>
+              <h2 className="text-3xl font-bold text-gray-800">{selectedRecipe.name}</h2>
+              <button onClick={toggleCookingMode} className="bg-green-600 text-white px-4 py-2 rounded-xl font-bold text-sm shadow-md hover:bg-green-700 flex items-center gap-2 animate-pulse">
+                  <MonitorPlay size={18}/> 요리 시작
+              </button>
+           </div>
+           
+           {/* 카테고리 태그들 */}
+           <div className="flex gap-2 mt-2 mb-4">
+               <span className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full font-bold">{selectedRecipe.category}</span>
+               <span className="bg-gray-100 text-gray-600 text-xs px-2 py-1 rounded-full">재료 {selectedRecipe.ingredients.length}개</span>
+           </div>
+
+           {/* 🌟 [핵심 기능] 요리 과학 연동 버튼 영역 */}
+           {relatedTheories.length > 0 && (
+             <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-3 animate-in slide-in-from-left duration-500">
+               <h3 className="text-xs font-bold text-indigo-800 mb-2 flex items-center gap-1">
+                 <BookOpen size={14}/> 맛의 비밀 (요리 과학)
+               </h3>
+               <div className="flex flex-wrap gap-2">
+                 {relatedTheories.map(theory => (
+                   <button 
+                     key={theory.id}
+                     // 👇 이 버튼을 누르면 과학 탭으로 이동하고 해당 이론을 펼침
+                     onClick={() => onNavigateToTheory(theory.id)} 
+                     className="bg-white text-indigo-600 border border-indigo-200 px-3 py-1.5 rounded-lg text-xs font-bold shadow-sm hover:bg-indigo-600 hover:text-white transition-all flex items-center gap-1"
+                   >
+                     {theory.title} <ArrowRight size={10} />
+                   </button>
+                 ))}
                </div>
-               <div className="flex gap-2 mt-2">
-                   <span className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full font-bold">{selectedRecipe.category}</span>
-                   <span className="bg-gray-100 text-gray-600 text-xs px-2 py-1 rounded-full">재료 {selectedRecipe.ingredients.length}개</span>
-               </div>
-            </div>
-            {relatedTheories.length > 0 && (
-          <div className="mb-6 animate-in slide-in-from-left duration-500">
-            <h3 className="text-sm font-bold text-gray-500 mb-2 flex items-center gap-1">
-              <BookOpen size={14} className="text-indigo-500"/> 이 요리에 숨겨진 과학
-            </h3>
-            <div className="flex flex-wrap gap-2">
-              {relatedTheories.map(theory => (
-                <button 
-                  key={theory.id}
-                  onClick={() => onNavigateToTheory(theory.id)}
-                  className="bg-indigo-50 text-indigo-700 border border-indigo-100 px-3 py-2 rounded-xl text-xs font-bold shadow-sm hover:bg-indigo-100 transition-colors flex items-center gap-2"
-                >
-                  <span>{theory.title}</span>
-                  <ArrowRight size={12} />
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
+             </div>
+           )}
+        </div>
             <div className="bg-green-50 p-4 rounded-2xl mb-6 border border-green-100 flex items-center justify-between">
                <span className="font-bold text-green-800 flex items-center gap-2"><Users size={18}/> 기준 인원</span>
                <div className="flex items-center bg-white rounded-lg shadow-sm">
@@ -2784,21 +2792,26 @@ function RecipeView({ ingredients, onAddToCart, recipes, user, onNavigateToTheor
 
   // [VIEW 3] 목록 화면
   return (
-      <div className="p-4 pb-24 h-full overflow-y-auto bg-white"> {/* 👈 flex-col 제거, 스크롤 추가 */}
-        <div className="flex justify-between items-center mb-6">
-            <h2 className="text-xl font-bold">오늘 뭐 먹지?</h2>
-            <div className="flex gap-2">
+      <div className="p-4 pb-24 h-full overflow-y-auto bg-white">
+        
+        {/* 🌟 [수정] 제목과 버튼이 겹치지 않게 '세로 배치(flex-col)'로 변경하고 가로 스크롤 허용 */}
+        <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-3 mb-6">
+            <h2 className="text-xl font-bold whitespace-nowrap text-gray-800">오늘 뭐 먹지?</h2>
+            
+            <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar w-full md:w-auto">
+                {/* 냉장고 털기 버튼 */}
                 <button 
                     onClick={() => setIsFridgeClearingMode(!isFridgeClearingMode)} 
-                    className={`px-3 py-1.5 text-xs font-bold rounded-lg border transition-all flex items-center gap-1 ${isFridgeClearingMode ? 'bg-red-100 text-red-600 border-red-200' : 'bg-white text-gray-500 border-gray-200'}`}
+                    className={`px-3 py-2 text-xs font-bold rounded-lg border transition-all flex items-center gap-1 whitespace-nowrap flex-shrink-0 ${isFridgeClearingMode ? 'bg-red-100 text-red-600 border-red-200' : 'bg-white text-gray-500 border-gray-200'}`}
                 >
-                    <AlertCircle size={14} /> 냉장고 털기 {isFridgeClearingMode ? 'ON' : 'OFF'}
+                    <AlertCircle size={14} /> 냉파 {isFridgeClearingMode ? 'ON' : 'OFF'}
                 </button>
-                <div className="flex bg-gray-100 rounded-lg p-1">
-                    {/* 🟢 [Changed] 탭 버튼 3개로 확장 */}
-                    <button onClick={() => { setActiveTab('default'); setSelectedCategory(null); }} className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${activeTab === 'default' ? 'bg-white shadow-sm text-green-600' : 'text-gray-400'}`}>추천</button>
-                    <button onClick={() => { setActiveTab('category'); setSelectedCategory(null); }} className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${activeTab === 'category' ? 'bg-white shadow-sm text-green-600' : 'text-gray-400'}`}>카테고리</button>
-                    <button onClick={() => setActiveTab('my')} className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${activeTab === 'my' ? 'bg-white shadow-sm text-green-600' : 'text-gray-400'}`}>MY</button>
+                
+                {/* 탭 버튼 그룹 */}
+                <div className="flex bg-gray-100 rounded-lg p-1 flex-shrink-0">
+                    <button onClick={() => { setActiveTab('default'); setSelectedCategory(null); }} className={`px-3 py-1 text-xs font-bold rounded-md transition-all whitespace-nowrap ${activeTab === 'default' ? 'bg-white shadow-sm text-green-600' : 'text-gray-400'}`}>추천</button>
+                    <button onClick={() => { setActiveTab('category'); setSelectedCategory(null); }} className={`px-3 py-1 text-xs font-bold rounded-md transition-all whitespace-nowrap ${activeTab === 'category' ? 'bg-white shadow-sm text-green-600' : 'text-gray-400'}`}>카테고리</button>
+                    <button onClick={() => setActiveTab('my')} className={`px-3 py-1 text-xs font-bold rounded-md transition-all whitespace-nowrap ${activeTab === 'my' ? 'bg-white shadow-sm text-green-600' : 'text-gray-400'}`}>MY</button>
                 </div>
             </div>
         </div>
@@ -2822,7 +2835,7 @@ function RecipeView({ ingredients, onAddToCart, recipes, user, onNavigateToTheor
                 ))}
             </div>
         </div>
-
+        
         {/* 🟢 [New] 카테고리 선택 화면 (카테고리 탭이고, 아직 선택 안했을 때) */}
         {activeTab === 'category' && !selectedCategory && (
             <div className="grid grid-cols-2 gap-3 mb-4">
