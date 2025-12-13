@@ -2680,20 +2680,20 @@ function RecipeView({ ingredients, onAddToCart, recipes, user, onNavigateToTheor
   if (isCookingMode && selectedRecipe) {
      const scaledSteps = selectedRecipe.steps.map(s => scaleText(s, servings));
      return (
-        <div className="fixed inset-0 z-50 bg-gray-900 text-white flex flex-col animate-in fade-in duration-300">
-           <div className="flex justify-between items-center p-6 border-b border-gray-700">
+        <div className="fixed inset-0 z-50 bg-white text-gray-900 flex flex-col animate-in fade-in duration-300">
+           <div className="flex justify-between items-center p-6 border-b border-gray-100">
               <h2 className="text-xl font-bold truncate pr-4">{selectedRecipe.name} (Step {currentStep + 1}/{scaledSteps.length})</h2>
-              <button onClick={toggleCookingMode} className="bg-red-600 px-4 py-2 rounded-lg font-bold text-sm flex items-center gap-1 hover:bg-red-700"><X size={16}/> 종료</button>
+              <button onClick={toggleCookingMode} className="bg-red-100 text-red-600 px-4 py-2 rounded-lg font-bold text-sm flex items-center gap-1 hover:bg-red-200"><X size={16}/> 종료</button>
            </div>
-           <div className="flex-1 flex items-center justify-center p-8 text-center">
+           <div className="flex-1 flex items-center justify-center p-8 text-center overflow-y-auto">
               <div className="max-w-2xl">
-                  <span className="inline-block bg-green-600 text-2xl font-bold rounded-full w-16 h-16 flex items-center justify-center mb-6 mx-auto shadow-lg shadow-green-900/50">{currentStep + 1}</span>
+                  <span className="inline-block bg-green-100 text-green-700 text-2xl font-bold rounded-full w-16 h-16 flex items-center justify-center mb-6 mx-auto shadow-sm">{currentStep + 1}</span>
                   <p className="text-2xl md:text-4xl font-bold leading-relaxed whitespace-pre-wrap">{scaledSteps[currentStep]}</p>
               </div>
            </div>
-           <div className="p-8 pb-10 flex justify-between items-center bg-gray-800">
-              <button disabled={currentStep===0} onClick={()=>setCurrentStep(prev=>prev-1)} className="flex items-center gap-2 text-lg font-bold disabled:opacity-30 hover:text-green-400"><ChevronLeft size={30}/> 이전</button>
-              <button disabled={currentStep===scaledSteps.length-1} onClick={()=>setCurrentStep(prev=>prev+1)} className="flex items-center gap-2 text-lg font-bold disabled:opacity-30 hover:text-green-400">다음 <ChevronRight size={30}/></button>
+           <div className="p-8 pb-10 flex justify-between items-center bg-gray-50 border-t border-gray-200">
+              <button disabled={currentStep===0} onClick={()=>setCurrentStep(prev=>prev-1)} className="flex items-center gap-2 text-lg font-bold disabled:opacity-30 hover:text-green-600 text-gray-600"><ChevronLeft size={30}/> 이전</button>
+              <button disabled={currentStep===scaledSteps.length-1} onClick={()=>setCurrentStep(prev=>prev+1)} className="flex items-center gap-2 text-lg font-bold disabled:opacity-30 hover:text-green-600 text-gray-600">다음 <ChevronRight size={30}/></button>
            </div>
         </div>
      );
