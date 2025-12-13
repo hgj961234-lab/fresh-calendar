@@ -1,3 +1,4 @@
+// 업데이트 확인용 주석
 import React, { useState, useEffect } from 'react';
 import { 
   Calendar, Plus, ChefHat, Refrigerator, ChevronLeft, ChevronRight, AlertCircle, 
@@ -1535,6 +1536,8 @@ function FridgeListView({ ingredients, getRiskLevel, moveToTrash, consumeItem, u
   const [filter, setFilter] = useState('all'); 
   const [sort, setSort] = useState('expiry');  
   const [selectedIds, setSelectedIds] = useState([]);
+  const [viewMode, setViewMode] = useState('list'); // 👈 보기 모드 추가 (list/map)
+  const [editingItem, setEditingItem] = useState(null); // 👈 수정 모달용 상태 추가
 
   const filtered = ingredients.filter(item => {
     if (filter === 'all') return true;
@@ -1558,62 +1561,61 @@ function FridgeListView({ ingredients, getRiskLevel, moveToTrash, consumeItem, u
       {/* 헤더 */}
       <div className="flex justify-between items-center mb-4">
         <h2 className="text-lg font-bold flex items-center gap-2 text-gray-800">내 냉장고 <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">{sorted.length}</span></h2>
+        <div className="flex bg-gray-100 rounded-lg p-1 mr-2">
+            <button onClick={() => setViewMode('list')} className={`px-3 py-1.5 rounded-md text-xs font-bold flex items-center gap-1 transition-all ${viewMode === 'list' ? 'bg-white shadow text-gray-800' : 'text-gray-400'}`}><Menu size={14}/> 목록</button>
+            <button onClick={() => setViewMode('map')} className={`px-3 py-1.5 rounded-md text-xs font-bold flex items-center gap-1 transition-all ${viewMode === 'map' ? 'bg-white shadow text-blue-600' : 'text-gray-400'}`}><LayoutGrid size={14}/> 지도</button>
+        </div>
         <button onClick={onOpenTrash} className="p-2 text-gray-400 hover:text-red-500 bg-white rounded-full border border-gray-100 shadow-sm"><Trash2 size={18} /></button>
       </div>
 
-      {/* 필터 & 정렬 */}
-      <div className="flex flex-col gap-3 mb-4">
-        <div className="flex bg-gray-100 p-1 rounded-xl">
-            {['all', 'fridge', 'freezer', 'pantry'].map(f => (
-                <button key={f} onClick={() => setFilter(f)} className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${filter === f ? 'bg-white text-green-700 shadow-sm' : 'text-gray-400'}`}>
-                    {f === 'all' ? '전체' : f === 'fridge' ? '냉장' : f === 'freezer' ? '냉동' : '실온'}
-                </button>
-            ))}
+      {viewMode === 'map' ? (
+        <FridgeMap ingredients={ingredients} onItemClick={(item) => setEditingItem(item)} />
+    ) : (
+      <>
+        {/* 필터 & 정렬 */}
+        <div className="flex flex-col gap-3 mb-4">
+           {/* ... (기존 필터 코드 유지) ... */}
+           <div className="flex bg-gray-100 p-1 rounded-xl">
+             {['all', 'fridge', 'freezer', 'pantry'].map(f => (<button key={f} onClick={() => setFilter(f)} className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${filter === f ? 'bg-white text-green-700 shadow-sm' : 'text-gray-400'}`}>{f === 'all' ? '전체' : f === 'fridge' ? '냉장' : f === 'freezer' ? '냉동' : '실온'}</button>))}
+           </div>
+           <div className="flex justify-end">
+               <select value={sort} onChange={e => setSort(e.target.value)} className="bg-white border border-gray-200 text-xs font-bold px-3 py-1.5 rounded-lg outline-none text-gray-600">
+                   <option value="expiry">⏳ 유통기한 급한순</option><option value="newest">✨ 최근 등록순</option><option value="name">가나다 이름순</option>
+               </select>
+           </div>
         </div>
-        <div className="flex justify-end">
-            <select value={sort} onChange={e => setSort(e.target.value)} className="bg-white border border-gray-200 text-xs font-bold px-3 py-1.5 rounded-lg outline-none text-gray-600">
-                <option value="expiry">⏳ 유통기한 급한순</option>
-                <option value="newest">✨ 최근 등록순</option>
-                <option value="name">가나다 이름순</option>
-            </select>
+
+        {/* 선택 액션 및 리스트 */}
+        <div className="flex gap-2 mb-4">
+             <button onClick={toggleSelectAll} className="text-xs bg-white border border-gray-200 text-gray-600 px-3 py-2.5 rounded-xl font-bold flex items-center gap-1 shadow-sm flex-1 justify-center">{selectedIds.length === sorted.length && sorted.length > 0 ? <CheckSquare size={14} className="text-green-600" /> : <Square size={14} />} 전체</button>
+             {selectedIds.length > 0 && (<><button onClick={handleConsumeSelected} className="text-xs bg-green-600 text-white px-3 py-2.5 rounded-xl font-bold shadow-md flex-[2] flex items-center justify-center gap-1"><Utensils size={14} /> 먹었어요</button><button onClick={handleWasteSelected} className="text-xs bg-red-100 text-red-600 px-3 py-2.5 rounded-xl font-bold shadow-sm flex-1 flex items-center justify-center gap-1"><Trash2 size={14} /> 버릴래요</button></>)}
         </div>
-      </div>
 
-      {/* 선택 액션 */}
-      <div className="flex gap-2 mb-4">
-        <button onClick={toggleSelectAll} className="text-xs bg-white border border-gray-200 text-gray-600 px-3 py-2.5 rounded-xl font-bold flex items-center gap-1 shadow-sm flex-1 justify-center">
-            {selectedIds.length === sorted.length && sorted.length > 0 ? <CheckSquare size={14} className="text-green-600" /> : <Square size={14} />} 전체
-        </button>
-        {selectedIds.length > 0 && (
-          <>
-            <button onClick={handleConsumeSelected} className="text-xs bg-green-600 text-white px-3 py-2.5 rounded-xl font-bold shadow-md animate-in zoom-in duration-200 flex-[2] flex items-center justify-center gap-1"><Utensils size={14} /> 먹었어요</button>
-            <button onClick={handleWasteSelected} className="text-xs bg-red-100 text-red-600 px-3 py-2.5 rounded-xl font-bold shadow-sm animate-in zoom-in duration-200 flex-1 flex items-center justify-center gap-1"><Trash2 size={14} /> 버릴래요</button>
-          </>
-        )}
-      </div>
-
-
-      {/* 리스트 아이템 */}
-      <div className="space-y-3">
-        {sorted.map(item => {
-           const risk = getRiskLevel(item.expiry, item.name);
-           const diff = item.expiry ? Math.ceil((item.expiry - new Date().setHours(0,0,0,0)) / (86400000)) : 0;
-           const isSelected = selectedIds.includes(item.id);
-           return (
-            <div key={item.id} className={`bg-white p-4 rounded-2xl border border-gray-100 shadow-sm transition-all flex items-center justify-between group cursor-pointer ${isSelected ? 'ring-2 ring-green-500 bg-green-50' : 'hover:border-green-300'}`} onClick={() => toggleSelect(item.id)}>
-               <div className="flex items-center gap-3 flex-1">
-                 <div className={`text-gray-300 ${isSelected ? 'text-green-600' : ''}`}>{isSelected ? <CheckSquare size={20} /> : <Square size={20} />}</div>
-                 <div className={`w-1.5 h-10 rounded-full ${risk === 'danger' ? 'bg-red-500' : risk === 'warning' ? 'bg-yellow-400' : 'bg-green-400'}`}></div>
-                 <div>
-                   <h3 className="font-bold text-gray-800 flex items-center gap-1">{item.name} <span className="text-[10px] font-normal text-gray-400 border px-1 rounded">{item.category}</span></h3>
-                   <p className={`text-xs mt-0.5 ${risk === 'danger' ? 'text-red-500 font-bold' : 'text-gray-500'}`}>{diff < 0 ? '만료됨' : diff === 0 ? '오늘 만료' : `D-${diff}`}</p>
-                 </div>
-               </div>
-            </div>
-           );
-        })}
-        {sorted.length === 0 && <div className="text-center py-20 text-gray-400">표시할 재료가 없어요.<br/>필터를 변경해보세요!</div>}
-      </div>
+        <div className="space-y-3">
+          {sorted.map(item => {
+              const risk = getRiskLevel(item.expiry, item.name);
+              const diff = item.expiry ? Math.ceil((item.expiry - new Date().setHours(0,0,0,0)) / (86400000)) : 0;
+              const isSelected = selectedIds.includes(item.id);
+              return (
+              <div key={item.id} className={`bg-white p-4 rounded-2xl border border-gray-100 shadow-sm transition-all flex items-center justify-between group cursor-pointer ${isSelected ? 'ring-2 ring-green-500 bg-green-50' : 'hover:border-green-300'}`}>
+                  <div className="flex items-center gap-3 flex-1">
+                    <div className="cursor-pointer p-1" onClick={(e) => { e.stopPropagation(); toggleSelect(item.id); }}>{isSelected ? <CheckSquare size={20} className="text-green-600"/> : <Square size={20} className="text-gray-300"/>}</div>
+                    <div className="flex-1 cursor-pointer" onClick={() => setEditingItem(item)}>
+                      <div className={`w-1.5 h-10 rounded-full float-left mr-3 ${risk === 'danger' ? 'bg-red-500' : risk === 'warning' ? 'bg-yellow-400' : 'bg-green-400'}`}></div>
+                      <div>
+                        <h3 className="font-bold text-gray-800 flex items-center gap-1">{item.name} <span className="text-[9px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded border truncate max-w-[100px]">{item.location ? item.location.split(':')[0] : item.category}</span></h3>
+                        <p className={`text-xs mt-0.5 ${risk === 'danger' ? 'text-red-500 font-bold' : 'text-gray-500'}`}>{diff < 0 ? '만료됨' : diff === 0 ? '오늘 만료' : `D-${diff}`}</p>
+                      </div>
+                    </div>
+                  </div>
+              </div>
+              );
+          })}
+          {sorted.length === 0 && <div className="text-center py-20 text-gray-400">표시할 재료가 없어요.<br/>필터를 변경해보세요!</div>}
+        </div>
+      </>
+    )}
+    {editingItem && <EditIngredientModal item={editingItem} onClose={() => setEditingItem(null)} onUpdate={updateIngredient} />}
     </div>
   );
 }
@@ -1696,7 +1698,7 @@ function AddItemModal({ onClose, onAdd, initialDate }) {
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!name) return;
-    onAdd({ name, expiry: new Date(expiry), category, price: Number(price) || 0, amount: Number(amount) || 0, unit: unit });
+    onAdd({ name, expiry: new Date(expiry), category, location, price: Number(price) || 0, amount: Number(amount) || 0, unit: unit }); // 👈 location 추가됨
     onClose();
   };
 
@@ -1723,6 +1725,19 @@ function AddItemModal({ onClose, onAdd, initialDate }) {
                 {cat === 'fridge' ? '냉장' : cat === 'freezer' ? '냉동' : '실온'}
               </button>
             ))}
+          </div>
+
+          {/* 👇 위치 선택 드롭다운 추가 */}
+          <div>
+            <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1 ml-1">보관 위치 (자동 추천됨)</label>
+            <select value={location} onChange={(e)=>setLocation(e.target.value)} className="w-full p-3 bg-gray-50 dark:bg-gray-700 dark:text-white rounded-xl border border-gray-100 dark:border-gray-600 outline-none text-sm font-bold">
+                <option value="🥬 상칸: 신선 야채/과일실 (수분케어)">🥬 상칸: 신선 야채/과일실</option>
+                <option value="🚪 상칸: 도어 바스켓/매직스페이스">🚪 상칸: 도어 바스켓</option>
+                <option value="🥘 상칸: 메인 선반 (반찬/요리)">🥘 상칸: 메인 선반</option>
+                <option value="🥓 상칸: 멀티 수납 코너 (신선맞춤)">🥓 상칸: 멀티 수납 코너</option>
+                <option value="❄️ 하칸: 냉동 서랍 (육류/생선)">❄️ 하칸: 냉동 서랍</option>
+                <option value="🏠 실온: 다용도실/팬트리">🏠 실온: 다용도실</option>
+            </select>
           </div>
 
           <div className="flex gap-2">
@@ -2356,5 +2371,56 @@ function NavBtn({ active, onClick, icon, label, count }) {
       </div>
       <span className="text-[10px] font-medium">{label}</span>
     </button>
+  );
+}
+
+// 🌟 [신규] 재료 정보 수정 모달
+function EditIngredientModal({ item, onClose, onUpdate }) {
+  const [data, setData] = useState({ ...item, expiry: item.expiry ? new Date(item.expiry).toISOString().split('T')[0] : '' });
+  const handleSubmit = () => {
+    onUpdate(item.id, { ...data, expiry: new Date(data.expiry), price: Number(data.price), amount: Number(data.amount) });
+    onClose(); toast.success('정보가 수정되었습니다! 📝');
+  };
+  return (
+    <div className="fixed inset-0 bg-black/60 z-[60] flex items-center justify-center p-4 animate-in fade-in" onClick={onClose}>
+      <div className="bg-white w-full max-w-sm rounded-3xl p-6 shadow-2xl" onClick={e=>e.stopPropagation()}>
+        <h2 className="text-xl font-bold mb-4">재료 정보 수정</h2>
+        <div className="space-y-3">
+          <div><label className="text-xs text-gray-500">이름</label><input type="text" value={data.name} onChange={e=>setData({...data, name: e.target.value})} className="w-full p-2 border rounded-lg font-bold"/></div>
+          <div><label className="text-xs text-gray-500">위치 (LG 4도어)</label>
+            <select value={data.location || ''} onChange={e=>setData({...data, location: e.target.value})} className="w-full p-2 border rounded-lg">
+                <option value="🥬 상칸: 신선 야채/과일실 (수분케어)">🥬 신선 야채실</option><option value="🚪 상칸: 도어 바스켓/매직스페이스">🚪 도어 바스켓</option><option value="🥘 상칸: 메인 선반 (반찬/요리)">🥘 메인 선반</option><option value="🥓 상칸: 멀티 수납 코너 (신선맞춤)">🥓 멀티 수납 코너</option><option value="❄️ 하칸: 냉동 서랍 (육류/생선)">❄️ 냉동 서랍</option><option value="🏠 실온: 다용도실/팬트리">🏠 실온</option>
+            </select></div>
+          <div className="flex gap-2"><div className="flex-1"><label className="text-xs text-gray-500">유통기한</label><input type="date" value={data.expiry} onChange={e=>setData({...data, expiry: e.target.value})} className="w-full p-2 border rounded-lg"/></div><div className="flex-1"><label className="text-xs text-gray-500">가격</label><input type="number" value={data.price} onChange={e=>setData({...data, price: e.target.value})} className="w-full p-2 border rounded-lg"/></div></div>
+        </div>
+        <div className="flex gap-2 mt-6"><button onClick={onClose} className="flex-1 py-3 bg-gray-100 rounded-xl font-bold text-gray-500">취소</button><button onClick={handleSubmit} className="flex-1 py-3 bg-green-600 text-white rounded-xl font-bold">저장하기</button></div>
+      </div>
+    </div>
+  );
+}
+
+// 🌟 [신규] LG 4도어 스타일 시각적 냉장고 지도
+function FridgeMap({ ingredients, onItemClick }) {
+  const getItems = (keyword) => ingredients.filter(i => i.location && i.location.includes(keyword));
+  const renderItem = (item) => (
+    <button key={item.id} onClick={(e) => { e.stopPropagation(); onItemClick(item); }} className="bg-white/90 shadow-sm border border-gray-200 rounded-md px-1.5 py-1 text-[10px] font-bold text-gray-700 truncate max-w-full hover:bg-green-100 hover:scale-105 transition-transform flex items-center gap-1">
+      <div className={`w-1.5 h-1.5 rounded-full ${new Date(item.expiry) < new Date() ? 'bg-red-500' : 'bg-green-400'}`} />{item.name}
+    </button>
+  );
+  return (
+    <div className="p-2 animate-in fade-in zoom-in duration-300">
+      <div className="border-[6px] border-gray-300 rounded-[30px] overflow-hidden shadow-2xl bg-gray-100 flex flex-col h-[75vh] md:h-[600px]">
+        <div className="flex-[2] flex border-b-4 border-gray-300 relative bg-white">
+            <div className="w-[18%] border-r border-gray-200 bg-blue-50/30 flex flex-col gap-1 p-1 items-center"><span className="text-[9px] text-gray-400 font-bold mb-1">좌측 도어</span><div className="flex flex-col gap-1 w-full overflow-y-auto no-scrollbar">{getItems('도어').slice(0, Math.ceil(getItems('도어').length/2)).map(renderItem)}</div></div>
+            <div className="flex-1 flex flex-col">
+                <div className="flex-1 p-2 bg-white flex flex-col"><span className="text-xs text-center text-gray-400 font-bold mb-2 flex justify-center items-center gap-1"><Refrigerator size={12}/> 냉장실 메인</span><div className="grid grid-cols-3 gap-1 content-start overflow-y-auto">{getItems('메인 선반').map(renderItem)}{getItems('멀티 수납').map(renderItem)}</div></div>
+                <div className="h-[30%] border-t-2 border-green-100 bg-green-50/30 p-2"><span className="text-[10px] text-green-600 font-bold block text-center mb-1">🥬 신선 야채/과일실</span><div className="grid grid-cols-3 gap-1 overflow-y-auto h-full pb-4">{getItems('야채').map(renderItem)}</div></div>
+            </div>
+            <div className="w-[18%] border-l border-gray-200 bg-blue-50/30 flex flex-col gap-1 p-1 items-center"><span className="text-[9px] text-gray-400 font-bold mb-1">우측 도어</span><div className="flex flex-col gap-1 w-full overflow-y-auto no-scrollbar">{getItems('도어').slice(Math.ceil(getItems('도어').length/2)).map(renderItem)}</div></div>
+        </div>
+        <div className="flex-1 bg-blue-100/20 flex flex-col p-3 relative"><div className="absolute top-2 left-3 flex items-center gap-1 text-blue-400 font-bold text-xs"><Snowflake size={14}/> 냉동실</div><div className="mt-6 grid grid-cols-4 gap-2 overflow-y-auto content-start h-full">{getItems('냉동').map(renderItem)}{ingredients.filter(i => i.category === 'freezer' && (!i.location || !i.location.includes('냉동'))).map(renderItem)}</div></div>
+      </div>
+      <div className="mt-4 bg-orange-50 rounded-xl p-3 border border-orange-100 border-dashed"><span className="text-xs font-bold text-orange-600 mb-2 block">🏠 실온 / 팬트리</span><div className="flex flex-wrap gap-2">{getItems('실온').map(renderItem)}{ingredients.filter(i => i.category === 'pantry' && (!i.location || !i.location.includes('실온'))).map(renderItem)}</div></div>
+    </div>
   );
 }
