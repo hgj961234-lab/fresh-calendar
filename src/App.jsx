@@ -1841,8 +1841,9 @@ function AppContent({ user }) {
             {activeTab === 'trash' && <TrashView trashItems={trashItems} onRestore={restoreFromTrash} onPermanentDelete={permanentDelete} onClose={() => setActiveTab('list')} />}
             
             {/* 👇 [수정된 부분] RecipeView에 onNavigateToTheory 속성을 추가했습니다. */}
-            {activeTab === 'recipes' && <RecipeView ingredients={ingredients} onAddToCart={addToCart} recipes={RECIPE_FULL_DB} user={user} onNavigateToTheory={handleGoToTheory}selectedRecipe={selectedRecipe}       
-                setSelectedRecipe={setSelectedRecipe} />} 
+            {activeTab === 'recipes' && <RecipeView ingredients={ingredients} onAddToCart={addToCart} recipes={RECIPE_FULL_DB} user={user} onNavigateToTheory={handleGoToTheory} 
+              selectedRecipe={selectedRecipe}        
+              setSelectedRecipe={setSelectedRecipe} />}
             
             {activeTab === 'cart' && <ShoppingCartView cart={cart} ingredients={ingredients} onUpdateCount={updateCartCount} onRemove={removeItemsFromCart} onCheckout={checkoutCartItems} onUpdateDetail={updateCartItemDetail} onAdd={addToCart} />}
             {activeTab === 'stats' && <InsightsView ingredients={ingredients} onAddToCart={addToCart} history={historyItems} onResetHistory={resetHistory} />}
@@ -2479,7 +2480,7 @@ function ShoppingCartView({ cart, ingredients, onUpdateCount, onRemove, onChecko
 }
 
 // --- RecipeView: 카테고리별 보기 기능 추가됨 ---
-function RecipeView({ ingredients, onAddToCart, recipes, user, onNavigateToTheory }) {
+function RecipeView({ ingredients, onAddToCart, recipes, user, onNavigateToTheory, selectedRecipe, setSelectedRecipe }) {
   const [activeTab, setActiveTab] = useState('default'); // 'default'(추천), 'category', 'my'
   const [myRecipes, setMyRecipes] = useState([]);
   
