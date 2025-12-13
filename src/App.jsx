@@ -5,8 +5,8 @@ import {
   BarChart2, TrendingUp, AlertTriangle, ShoppingCart, Edit2, Snowflake, Archive, 
   BookOpen, ArrowLeft, Users, LogOut, Loader, Bell, PieChart, DollarSign, Undo2,
   Utensils, Filter, SlidersHorizontal, Download, 
-  // 👇 여기 3개가 새로 추가된 아이콘입니다.
-  Moon, Sun, MonitorPlay 
+  // 👇 지도 보기 및 메뉴 전환용 아이콘 추가
+  Moon, Sun, MonitorPlay, LayoutGrid, Menu
 } from 'lucide-react';
 import { Toaster, toast } from 'react-hot-toast'; // 👈 [추가] 토스트 알림
 
@@ -195,6 +195,17 @@ const SHELF_LIFE_DB = {
    
   // 기본값
   'default': { fridge: 7, price: 3000, unit: '100g', risk: { danger: 2, warning: 4 } }
+};
+
+// 🌟 [신규] LG 4도어 냉장고 맞춤 위치 추천 알고리즘
+const getRecommendedZone = (name, category) => {
+  if (category === 'freezer') return '❄️ 하칸: 냉동 서랍 (육류/생선)';
+  if (category === 'pantry') return '🏠 실온: 다용도실/팬트리';
+  const n = name.replace(/\s/g, ''); 
+  if (['상추','깻잎','시금치','콩나물','오이','당근','양배추','파','대파','쪽파','사과','배','포도','딸기','채소','야채','과일'].some(k => n.includes(k))) return '🥬 상칸: 신선 야채/과일실 (수분케어)';
+  if (['우유','주스','물','맥주','콜라','사이다','케찹','마요네즈','소스','드레싱','잼','치즈','버터','계란','달걀'].some(k => n.includes(k))) return '🚪 상칸: 도어 바스켓/매직스페이스';
+  if (['햄','베이컨','소시지','맛살','어묵','두부','자투리'].some(k => n.includes(k))) return '🥓 상칸: 멀티 수납 코너 (신선맞춤)';
+  return '🥘 상칸: 메인 선반 (반찬/요리)';
 };
 
 // --- 레시피 데이터베이스 (60종 - 상세 버전 & 재료 동기화) ---
@@ -1391,12 +1402,16 @@ function AppContent({ user }) {
         {/* 2. 메인 앱 화면 (모바일 뷰 & PC 메인 컨텐츠) */}
         <div className="bg-white md:rounded-[30px] shadow-2xl flex flex-col h-full md:h-[85vh] overflow-hidden border-x md:border-0 relative max-w-md mx-auto md:mx-0 w-full">
           <header className="md:hidden bg-green-600 text-white p-5 pt-6 shadow-md z-10 flex justify-between items-center">
-            <div><h1 className="text-xl font-bold flex items-center gap-2"><Refrigerator /> Fresh Calendar</h1><p className="text-green-100 text-xs mt-1 opacity-80">{user.email}</p></div>
-            <div className="flex gap-2">
-               <button onClick={requestNotificationPermission} className="p-2 bg-green-700 rounded-full hover:bg-green-800 transition-colors"><Bell size={18} /></button>
-               <button onClick={resetFridge} className="p-2 bg-green-700 rounded-full hover:bg-red-600 transition-colors" title="초기화"><RefreshCcw size={18} /></button>
-               <button onClick={() => signOut(auth)} className="p-2 bg-green-700 rounded-full hover:bg-green-800 transition-colors"><LogOut size={18} /></button>
+            <div>
+              <h1 className="text-xl font-bold flex items-center gap-2"><Refrigerator /> Fresh Calendar</h1>
+              <p className="text-green-100 text-xs mt-1 opacity-80">{user.email}</p>
             </div>
+            {/* 👇 알림, 초기화, 로그아웃 버튼 3개를 모두 추가함 */}
+            <div className="flex gap-2">
+              <button onClick={requestNotificationPermission} className="p-2 bg-green-700 rounded-full hover:bg-green-800 transition-colors"><Bell size={18} /></button>
+              <button onClick={resetFridge} className="p-2 bg-green-700 rounded-full hover:bg-red-600 transition-colors"><RefreshCcw size={18} /></button>
+              <button onClick={() => signOut(auth)} className="p-2 bg-green-700 rounded-full hover:bg-green-800 transition-colors"><LogOut size={18} /></button>
+            </div>    
           </header>
 
           <main className="flex-1 overflow-y-auto bg-gray-50 relative scroll-smooth">
@@ -1446,7 +1461,7 @@ function AppContent({ user }) {
 // NavBtn 컴포넌트는 기존 파일 맨 아래에 있는 거 그대로 쓰면 돼!
 
 // --- 캘린더 뷰 ---
-function CalendarView({ ingredients, getRiskLevel, onAddRequest, onDateSelect }) { // onDateSelect prop 추가 확인
+function CalendarView({ ingredients, getRiskLevel, onAddRequest, onDateSelect }) {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDayInfo, setSelectedDayInfo] = useState(null);
 
@@ -1466,9 +1481,9 @@ function CalendarView({ ingredients, getRiskLevel, onAddRequest, onDateSelect })
   return (
     <div className="p-4">
       <div className="flex justify-between items-center mb-6">
-        <button onClick={()=>setCurrentDate(new Date(year, month-1, 1))} className="p-2 dark:text-gray-200"><ChevronLeft /></button>
-        <h2 className="font-bold text-lg dark:text-white">{year}년 {month+1}월</h2>
-        <button onClick={()=>setCurrentDate(new Date(year, month+1, 1))} className="p-2 dark:text-gray-200"><ChevronRight /></button>
+        <button onClick={()=>setCurrentDate(new Date(year, month-1, 1))} className="p-2 text-gray-600 hover:bg-gray-100 rounded-full"><ChevronLeft /></button>
+        <h2 className="font-bold text-lg text-gray-800">{year}년 {month+1}월</h2>
+        <button onClick={()=>setCurrentDate(new Date(year, month+1, 1))} className="p-2 text-gray-600 hover:bg-gray-100 rounded-full"><ChevronRight /></button>
       </div>
       <div className="grid grid-cols-7 text-center text-xs text-gray-400 font-bold mb-2">
         {['일','월','화','수','목','금','토'].map(d=><div key={d}>{d}</div>)}
@@ -1483,8 +1498,8 @@ function CalendarView({ ingredients, getRiskLevel, onAddRequest, onDateSelect })
             <div key={day} onClick={() => { 
                 setSelectedDayInfo({ day, items: dayItems, dateObj: new Date(year, month, day) });
                 if(onDateSelect) onDateSelect(new Date(year, month, day)); 
-            }} className={`h-16 border rounded-xl p-1 relative flex flex-col items-center justify-between cursor-pointer transition-colors hover:bg-green-50 dark:hover:bg-gray-700 ${isToday ? 'bg-green-50 dark:bg-green-900/30 border-green-400' : 'bg-white dark:bg-gray-800 border-gray-100 dark:border-gray-700'}`}>
-              <span className={`text-xs font-bold ${isToday ? 'text-green-700 dark:text-green-400' : 'text-gray-600 dark:text-gray-300'}`}>{day}</span>
+            }} className={`h-16 border rounded-xl p-1 relative flex flex-col items-center justify-between cursor-pointer transition-colors hover:bg-green-50 ${isToday ? 'bg-green-50 border-green-400' : 'bg-white border-gray-100'}`}>
+              <span className={`text-xs font-bold ${isToday ? 'text-green-700' : 'text-gray-600'}`}>{day}</span>
               <div className="flex flex-wrap justify-center gap-1 w-full px-0.5 mb-1">
                 {dayItems.slice(0, 4).map((item, idx) => {
                   const risk = getRiskLevel(item.expiry, item.name);
@@ -1498,12 +1513,12 @@ function CalendarView({ ingredients, getRiskLevel, onAddRequest, onDateSelect })
       </div>
       {selectedDayInfo && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-4 animate-in fade-in" onClick={() => setSelectedDayInfo(null)}>
-          <div className="bg-white dark:bg-gray-800 w-full max-w-sm rounded-2xl p-5 shadow-2xl" onClick={e => e.stopPropagation()}>
-            <div className="flex justify-between items-center mb-4"><h3 className="font-bold text-lg dark:text-white">{month+1}월 {selectedDayInfo.day}일 만료 목록</h3><button onClick={() => setSelectedDayInfo(null)}><X className="text-gray-400" /></button></div>
+          <div className="bg-white w-full max-w-sm rounded-2xl p-5 shadow-2xl" onClick={e => e.stopPropagation()}>
+            <div className="flex justify-between items-center mb-4"><h3 className="font-bold text-lg text-gray-800">{month+1}월 {selectedDayInfo.day}일 만료 목록</h3><button onClick={() => setSelectedDayInfo(null)}><X className="text-gray-400" /></button></div>
             <div className="space-y-2 max-h-60 overflow-y-auto mb-4">
               {selectedDayInfo.items.length === 0 ? <p className="text-gray-400 text-center py-4 text-sm">만료되는 상품이 없습니다.</p> : selectedDayInfo.items.map(item => (
-                  <div key={item.id} className="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-700 rounded-xl">
-                    <div className="flex items-center gap-2"><div className={`w-2 h-2 rounded-full ${getRiskLevel(item.expiry, item.name) === 'danger' ? 'bg-red-500' : 'bg-green-400'}`} /><span className="font-bold text-gray-700 dark:text-gray-200">{item.name}</span></div><span className="text-xs text-gray-500 dark:text-gray-400 capitalize">{item.category}</span>
+                  <div key={item.id} className="flex justify-between items-center p-3 bg-gray-50 rounded-xl">
+                    <div className="flex items-center gap-2"><div className={`w-2 h-2 rounded-full ${getRiskLevel(item.expiry, item.name) === 'danger' ? 'bg-red-500' : 'bg-green-400'}`} /><span className="font-bold text-gray-700">{item.name}</span></div><span className="text-xs text-gray-500 capitalize">{item.category}</span>
                   </div>
               ))}
             </div>
@@ -1520,7 +1535,6 @@ function FridgeListView({ ingredients, getRiskLevel, moveToTrash, consumeItem, u
   const [filter, setFilter] = useState('all'); 
   const [sort, setSort] = useState('expiry');  
   const [selectedIds, setSelectedIds] = useState([]);
-  const [editingItem, setEditingItem] = useState(null); // 에디팅 모달용 상태 (사용 안하면 제거 가능)
 
   const filtered = ingredients.filter(item => {
     if (filter === 'all') return true;
@@ -1543,21 +1557,21 @@ function FridgeListView({ ingredients, getRiskLevel, moveToTrash, consumeItem, u
     <div className="p-4 pb-24">
       {/* 헤더 */}
       <div className="flex justify-between items-center mb-4">
-        <h2 className="text-lg font-bold flex items-center gap-2 dark:text-white">내 냉장고 <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">{sorted.length}</span></h2>
-        <button onClick={onOpenTrash} className="p-2 text-gray-400 hover:text-red-500 bg-white dark:bg-gray-800 rounded-full border border-gray-100 dark:border-gray-700 shadow-sm"><Trash2 size={18} /></button>
+        <h2 className="text-lg font-bold flex items-center gap-2 text-gray-800">내 냉장고 <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">{sorted.length}</span></h2>
+        <button onClick={onOpenTrash} className="p-2 text-gray-400 hover:text-red-500 bg-white rounded-full border border-gray-100 shadow-sm"><Trash2 size={18} /></button>
       </div>
 
       {/* 필터 & 정렬 */}
       <div className="flex flex-col gap-3 mb-4">
-        <div className="flex bg-gray-100 dark:bg-gray-800 p-1 rounded-xl">
+        <div className="flex bg-gray-100 p-1 rounded-xl">
             {['all', 'fridge', 'freezer', 'pantry'].map(f => (
-                <button key={f} onClick={() => setFilter(f)} className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${filter === f ? 'bg-white dark:bg-gray-600 text-green-700 dark:text-green-300 shadow-sm' : 'text-gray-400'}`}>
+                <button key={f} onClick={() => setFilter(f)} className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${filter === f ? 'bg-white text-green-700 shadow-sm' : 'text-gray-400'}`}>
                     {f === 'all' ? '전체' : f === 'fridge' ? '냉장' : f === 'freezer' ? '냉동' : '실온'}
                 </button>
             ))}
         </div>
         <div className="flex justify-end">
-            <select value={sort} onChange={e => setSort(e.target.value)} className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-xs font-bold px-3 py-1.5 rounded-lg outline-none text-gray-600 dark:text-gray-300">
+            <select value={sort} onChange={e => setSort(e.target.value)} className="bg-white border border-gray-200 text-xs font-bold px-3 py-1.5 rounded-lg outline-none text-gray-600">
                 <option value="expiry">⏳ 유통기한 급한순</option>
                 <option value="newest">✨ 최근 등록순</option>
                 <option value="name">가나다 이름순</option>
@@ -1567,7 +1581,7 @@ function FridgeListView({ ingredients, getRiskLevel, moveToTrash, consumeItem, u
 
       {/* 선택 액션 */}
       <div className="flex gap-2 mb-4">
-        <button onClick={toggleSelectAll} className="text-xs bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 px-3 py-2.5 rounded-xl font-bold flex items-center gap-1 shadow-sm flex-1 justify-center">
+        <button onClick={toggleSelectAll} className="text-xs bg-white border border-gray-200 text-gray-600 px-3 py-2.5 rounded-xl font-bold flex items-center gap-1 shadow-sm flex-1 justify-center">
             {selectedIds.length === sorted.length && sorted.length > 0 ? <CheckSquare size={14} className="text-green-600" /> : <Square size={14} />} 전체
         </button>
         {selectedIds.length > 0 && (
@@ -1578,6 +1592,7 @@ function FridgeListView({ ingredients, getRiskLevel, moveToTrash, consumeItem, u
         )}
       </div>
 
+
       {/* 리스트 아이템 */}
       <div className="space-y-3">
         {sorted.map(item => {
@@ -1585,13 +1600,13 @@ function FridgeListView({ ingredients, getRiskLevel, moveToTrash, consumeItem, u
            const diff = item.expiry ? Math.ceil((item.expiry - new Date().setHours(0,0,0,0)) / (86400000)) : 0;
            const isSelected = selectedIds.includes(item.id);
            return (
-            <div key={item.id} className={`bg-white dark:bg-gray-800 p-4 rounded-2xl border dark:border-gray-700 shadow-sm transition-all flex items-center justify-between group cursor-pointer ${isSelected ? 'ring-2 ring-green-500 bg-green-50 dark:bg-green-900/20' : 'hover:border-green-300'}`} onClick={() => toggleSelect(item.id)}>
+            <div key={item.id} className={`bg-white p-4 rounded-2xl border border-gray-100 shadow-sm transition-all flex items-center justify-between group cursor-pointer ${isSelected ? 'ring-2 ring-green-500 bg-green-50' : 'hover:border-green-300'}`} onClick={() => toggleSelect(item.id)}>
                <div className="flex items-center gap-3 flex-1">
                  <div className={`text-gray-300 ${isSelected ? 'text-green-600' : ''}`}>{isSelected ? <CheckSquare size={20} /> : <Square size={20} />}</div>
                  <div className={`w-1.5 h-10 rounded-full ${risk === 'danger' ? 'bg-red-500' : risk === 'warning' ? 'bg-yellow-400' : 'bg-green-400'}`}></div>
                  <div>
-                   <h3 className="font-bold text-gray-800 dark:text-gray-100 flex items-center gap-1">{item.name} <span className="text-[10px] font-normal text-gray-400 dark:border-gray-600 border px-1 rounded">{item.category}</span></h3>
-                   <p className={`text-xs mt-0.5 ${risk === 'danger' ? 'text-red-500 font-bold' : 'text-gray-500 dark:text-gray-400'}`}>{diff < 0 ? '만료됨' : diff === 0 ? '오늘 만료' : `D-${diff}`}</p>
+                   <h3 className="font-bold text-gray-800 flex items-center gap-1">{item.name} <span className="text-[10px] font-normal text-gray-400 border px-1 rounded">{item.category}</span></h3>
+                   <p className={`text-xs mt-0.5 ${risk === 'danger' ? 'text-red-500 font-bold' : 'text-gray-500'}`}>{diff < 0 ? '만료됨' : diff === 0 ? '오늘 만료' : `D-${diff}`}</p>
                  </div>
                </div>
             </div>
@@ -1651,6 +1666,7 @@ function AddItemModal({ onClose, onAdd, initialDate }) {
   const [price, setPrice] = useState('');
   const [amount, setAmount] = useState('');
   const [unit, setUnit] = useState('g');
+  const [location, setLocation] = useState('🥘 상칸: 메인 선반 (반찬/요리)'); // 👈 위치 상태 추가
 
   const handleNameChange = (val) => {
     setName(val);
@@ -1659,6 +1675,8 @@ function AddItemModal({ onClose, onAdd, initialDate }) {
       if (dbItem.freezer && !dbItem.fridge) setCategory('freezer');
       else if (dbItem.pantry) setCategory('pantry');
       else setCategory('fridge');
+      
+      setLocation(getRecommendedZone(val, dbItem.freezer ? 'freezer' : dbItem.pantry ? 'pantry' : 'fridge')); // 👈 자동 추천 실행
 
       const days = dbItem.fridge || dbItem.freezer || dbItem.pantry || 7;
       const date = new Date();
@@ -1684,11 +1702,11 @@ function AddItemModal({ onClose, onAdd, initialDate }) {
 
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4 animate-in fade-in duration-200" onClick={onClose}>
-      <div className="bg-white dark:bg-gray-800 w-full max-w-sm rounded-3xl p-6 shadow-2xl scale-100 transition-transform" onClick={e => e.stopPropagation()}>
+      <div className="bg-white w-full max-w-sm rounded-3xl p-6 shadow-2xl scale-100 transition-transform" onClick={e => e.stopPropagation()}>
         
         <div className="flex justify-between items-center mb-6">
-          <h2 className="text-xl font-bold text-gray-800 dark:text-white">새 재료 추가</h2>
-          <button onClick={onClose} className="p-2 bg-gray-100 dark:bg-gray-700 rounded-full text-gray-500 hover:bg-gray-200 transition-colors">
+          <h2 className="text-xl font-bold text-gray-800">새 재료 추가</h2>
+          <button onClick={onClose} className="p-2 bg-gray-100 bg-gray-700 rounded-full text-gray-500 hover:bg-gray-200 transition-colors">
             <X size={20} className="dark:text-white"/>
           </button>
         </div>
@@ -2113,10 +2131,11 @@ function RecipeView({ ingredients, onAddToCart, recipes, user }) {
 
   // [VIEW 2] 상세 보기
   if (selectedRecipe) {
-      return (
-        <div className="p-4 pb-24 h-full bg-white flex flex-col overflow-y-auto">
-            <div className="bg-white pb-4 border-b mb-4 sticky top-0 z-10">
-               <button onClick={() => { setSelectedRecipe(null); setServings(1); }} className="text-gray-500 flex items-center gap-2 mb-2 hover:text-green-600 font-bold">
+  return (
+    <div className="p-4 pb-24 h-full bg-white flex flex-col overflow-y-auto">
+      {/* 👇 sticky 제거하여 스크롤 시 자연스럽게 올라감 */}
+      <div className="bg-white pb-4 border-b mb-4">
+        <button onClick={() => { setSelectedRecipe(null); setServings(1); }} className="text-gray-500 flex items-center gap-2 mb-2 hover:text-green-600 font-bold">
                    <ArrowLeft size={20}/> 목록으로 돌아가기
                </button>
                <div className="flex justify-between items-end">
