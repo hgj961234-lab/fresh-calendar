@@ -1497,7 +1497,16 @@ function AppContent({ user }) {
 
           <main className="flex-1 overflow-y-auto bg-gray-50 relative scroll-smooth">
             {activeTab === 'calendar' && <CalendarView ingredients={ingredients} getRiskLevel={getRiskLevel} onDateSelect={(d) => setSelectedDateForAdd(d)} onAddRequest={(d) => { setSelectedDateForAdd(d); setActiveTab('add'); }} />}
-            {activeTab === 'list' && <FridgeListView ingredients={ingredients} getRiskLevel={getRiskLevel} moveToTrash={moveToTrash} consumeItem={consumeItem} updateIngredient={updateIngredient} onOpenTrash={() => setActiveTab('trash')} onAddRequest={() => { setSelectedDateForAdd(new Date()); setActiveTab('add'); }} />}
+            {activeTab === 'list' && <FridgeListView 
+            ingredients={ingredients} 
+            getRiskLevel={getRiskLevel} 
+            moveToTrash={moveToTrash} 
+            consumeItem={consumeItem} 
+            deleteItemImmediately={deleteItemImmediately} // 👈 이 부분이 누락되어 있었습니다. 추가하세요.
+            updateIngredient={updateIngredient} 
+            onOpenTrash={() => setActiveTab('trash')} 
+            onAddRequest={() => { setSelectedDateForAdd(new Date()); setActiveTab('add'); }} 
+        />}
             {activeTab === 'trash' && <TrashView trashItems={trashItems} onRestore={restoreFromTrash} onPermanentDelete={permanentDelete} onClose={() => setActiveTab('list')} />}
             {activeTab === 'recipes' && <RecipeView ingredients={ingredients} onAddToCart={addToCart} recipes={RECIPE_FULL_DB} user={user} />} 
             {activeTab === 'cart' && <ShoppingCartView cart={cart} ingredients={ingredients} onUpdateCount={updateCartCount} onRemove={removeItemsFromCart} onCheckout={checkoutCartItems} onUpdateDetail={updateCartItemDetail} onAdd={addToCart} />}
@@ -1614,7 +1623,7 @@ function CalendarView({ ingredients, getRiskLevel, onAddRequest, onDateSelect })
 }
 
 // --- 냉장고 목록 뷰 (필터 & 정렬 추가 버전) ---
-function FridgeListView({ ingredients, getRiskLevel, moveToTrash, consumeItem, updateIngredient, onOpenTrash, onAddRequest }) {
+function FridgeListView({ ingredients, getRiskLevel, moveToTrash, consumeItem, deleteItemImmediately, updateIngredient, onOpenTrash, onAddRequest }) {
   const [filter, setFilter] = useState('all');
   const [sort, setSort] = useState('expiry');
   const [selectedIds, setSelectedIds] = useState([]);
@@ -1686,8 +1695,8 @@ function FridgeListView({ ingredients, getRiskLevel, moveToTrash, consumeItem, u
           <button onClick={(e) => {e.stopPropagation(); deleteItemImmediately(selectedIds); setSelectedIds([]);}} className="text-xs bg-gray-200 text-gray-600 px-3 py-2.5 rounded-xl font-bold shadow-sm flex-1 flex items-center justify-center gap-1"><X size={14} /> 삭제</button>
         </>
       )}
-    </div>
-
+  </div>
+   
           <div className="space-y-3">
             {sorted.map(item => {
                 const risk = getRiskLevel(item.expiry, item.name);
@@ -1768,7 +1777,11 @@ function AddItemModal({ onClose, onAdd, initialDate }) {
   const [amount, setAmount] = useState('');
   const [unit, setUnit] = useState('g');
   const [location, setLocation] = useState(ZONES.FRIDGE_MAIN_2);
-
+  const setQuickExpiry = (days) => {
+    const date = new Date();
+    date.setDate(date.getDate() + days);
+    setExpiry(date.toISOString().split('T')[0]);
+  };
   const handleLocationChange = (newLoc) => {
     setLocation(newLoc);
     // 🌟 [수정] 필터링 오류 해결을 위해 텍스트 포함 여부로 확실하게 카테고리 설정
@@ -1825,9 +1838,17 @@ function AddItemModal({ onClose, onAdd, initialDate }) {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1 ml-1">제품명</label>
-            <input type="text" required autoFocus value={name} onChange={(e) => handleNameChange(e.target.value)} className="w-full p-4 bg-gray-50 dark:bg-gray-700 dark:text-white rounded-2xl text-lg font-bold border-2 border-transparent focus:border-green-500 focus:bg-white dark:focus:bg-gray-600 outline-none transition-all placeholder:font-normal" placeholder="예: 우유, 두부" />
+            <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-1 ml-1">유통기한</label>
+            <input type="date" required value={expiry} onChange={(e) => setExpiry(e.target.value)} className="w-full p-3 bg-gray-50 dark:bg-gray-700 dark:text-white rounded-xl border border-gray-100 dark:border-gray-600 focus:border-green-500 outline-none font-medium mb-2" />
           </div>
+
+        <div className="flex flex-wrap gap-2">
+            <button type="button" onClick={() => setQuickExpiry(3)} className="px-3 py-1.5 bg-red-50 text-red-500 rounded-lg text-xs font-bold border border-red-100 hover:bg-red-100">🥩 고기(3일)</button>
+            <button type="button" onClick={() => setQuickExpiry(7)} className="px-3 py-1.5 bg-green-50 text-green-600 rounded-lg text-xs font-bold border border-green-100 hover:bg-green-100">🥦 야채(7일)</button>
+            <button type="button" onClick={() => setQuickExpiry(14)} className="px-3 py-1.5 bg-yellow-50 text-yellow-600 rounded-lg text-xs font-bold border border-yellow-100 hover:bg-yellow-100">🥛 유제품(2주)</button>
+            <button type="button" onClick={() => setQuickExpiry(30)} className="px-3 py-1.5 bg-blue-50 text-blue-600 rounded-lg text-xs font-bold border border-blue-100 hover:bg-blue-100">❄️ 냉동(1달)</button>
+          </div>
+        </div>
 
           <div className="flex gap-2">
             {['fridge', 'freezer', 'pantry'].map(cat => (
@@ -2588,114 +2609,84 @@ function FridgeMap({ ingredients, onItemClick }) {
   return (
     <div className="p-2 animate-in fade-in zoom-in duration-300 pb-20">
       {/* 🌟 전체 냉장고 프레임 */}
-      <div className="border-[8px] border-gray-300 rounded-[30px] shadow-2xl bg-gray-200 overflow-hidden flex flex-col h-[85vh] md:h-[700px]">
+      <div className="border-[8px] border-gray-300 rounded-[30px] shadow-2xl bg-gray-200 overflow-hidden flex flex-col h-[85vh] min-h-[750px]">
         
         {/* 1️⃣ 상단: 냉장실 (60% 높이) */}
-        <div className="flex-[6.5] flex bg-white border-b-[6px] border-gray-300">
+        <div className="flex-[5.5] flex bg-white border-b-[6px] border-gray-300">
             {/* 좌측 도어 */}
             <div className="w-[18%] border-r-2 border-gray-100 bg-blue-50/10 flex flex-col">
-    {/* 제목 */}
-    <div className="text-[9px] text-center text-gray-400 font-bold py-1 bg-gray-50 border-b">좌측 도어</div>
-
-    {/* 2. 내부를 세로(flex-col)로 배치 */}
-    <div className="flex-1 flex flex-col">
-        
-        {/* (상) flex-1로 공간 차지 + 아래 선(border-b) 긋기 */}
-        <div className="flex-1 border-b border-gray-100">
-            {renderItems(ZONES.FRIDGE_DOOR_LEFT_1, '상')}
-        </div>
-
-        {/* (중) flex-1로 공간 차지 + 아래 선(border-b) 긋기 */}
-        <div className="flex-1 border-b border-gray-100">
-            {renderItems(ZONES.FRIDGE_DOOR_LEFT_2, '중')}
-        </div>
-
-        {/* (하) flex-1로 공간 차지 (마지막 칸은 선 없음) */}
-        <div className="flex-1">
-            {renderItems(ZONES.FRIDGE_DOOR_LEFT_3, '하')}
-        </div>
-
-    </div>
-</div>
-
-            {/* 메인 공간 (중앙) */}
-            <div className="flex-1 flex flex-col border-r-2 border-gray-100">
-                {/* 메인 선반 3칸 */}
+                <div className="text-[9px] text-center text-gray-400 font-bold py-1 bg-gray-50 border-b">좌측 도어</div>
                 <div className="flex-1 flex flex-col">
-                    <div className="flex-1 border-b border-dashed border-gray-200 relative"><span className="absolute top-0 left-1 text-[8px] text-gray-300 font-bold">상단</span>{renderItems(ZONES.FRIDGE_MAIN_1)}</div>
-                    <div className="flex-1 border-b border-dashed border-gray-200 relative"><span className="absolute top-0 left-1 text-[8px] text-gray-300 font-bold">중단</span>{renderItems(ZONES.FRIDGE_MAIN_2)}</div>
-                    <div className="flex-1 border-b border-dashed border-gray-200 relative"><span className="absolute top-0 left-1 text-[8px] text-gray-300 font-bold">하단</span>{renderItems(ZONES.FRIDGE_MAIN_3)}</div>
-                </div>
-                {/* 멀티 수납 (2칸) */}
-                <div className="h-[15%] flex border-t-2 border-gray-200 bg-gray-50">
-                    <div className="flex-1 border-r border-gray-200 relative"><span className="absolute bottom-0 right-1 text-[8px] text-gray-400 font-bold">멀티(좌)</span>{renderItems(ZONES.FRIDGE_MULTI_1)}</div>
-                    <div className="flex-1 relative"><span className="absolute bottom-0 right-1 text-[8px] text-gray-400 font-bold">멀티(우)</span>{renderItems(ZONES.FRIDGE_MULTI_2)}</div>
-                </div>
-                {/* 신선 야채실 (2칸) */}
-                <div className="h-[20%] flex border-t-2 border-gray-200 bg-green-50/30">
-                     <div className="flex-1 border-r border-green-100 relative"><span className="absolute top-1 right-1 text-[9px] text-green-600 font-bold">🥬 신선야채(좌)</span>{renderItems(ZONES.FRIDGE_FRESH_1)}</div>
-                     <div className="flex-1 relative"><span className="absolute top-1 right-1 text-[9px] text-green-600 font-bold">🥬 신선야채(우)</span>{renderItems(ZONES.FRIDGE_FRESH_2)}</div>
+                    <div className="flex-1 border-b border-gray-100">{renderItems(ZONES.FRIDGE_DOOR_LEFT_1, '상')}</div>
+                    <div className="flex-1 border-b border-gray-100">{renderItems(ZONES.FRIDGE_DOOR_LEFT_2, '중')}</div>
+                    <div className="flex-1">{renderItems(ZONES.FRIDGE_DOOR_LEFT_3, '하')}</div>
                 </div>
             </div>
-
-            {/* 우측 도어 */}
+            <div className="flex-1 flex flex-col border-r-2 border-gray-100">
+                <div className="flex-[3] flex flex-col">
+                    <div className="flex-1 border-b border-dashed border-gray-200">{renderItems(ZONES.FRIDGE_MAIN_1, '상단 선반')}</div>
+                    <div className="flex-1 border-b border-dashed border-gray-200">{renderItems(ZONES.FRIDGE_MAIN_2, '중단 선반')}</div>
+                    <div className="flex-1 border-b border-dashed border-gray-200">{renderItems(ZONES.FRIDGE_MAIN_3, '하단 선반')}</div>
+                </div>
+                <div className="h-[12%] flex border-t-2 border-gray-200 bg-gray-50">
+                    <div className="flex-1 border-r border-gray-200">{renderItems(ZONES.FRIDGE_MULTI_1, '멀티(좌)')}</div>
+                    <div className="flex-1">{renderItems(ZONES.FRIDGE_MULTI_2, '멀티(우)')}</div>
+                </div>
+                <div className="h-[18%] flex border-t-2 border-gray-200 bg-green-50/20">
+                     <div className="flex-1 border-r border-green-100">{renderItems(ZONES.FRIDGE_FRESH_1, '🥬 신선야채(좌)')}</div>
+                     <div className="flex-1">{renderItems(ZONES.FRIDGE_FRESH_2, '🥬 신선야채(우)')}</div>
+                </div>
+            </div>
             <div className="w-[18%] bg-blue-50/10 flex flex-col">
-    <div className="text-[9px] text-center text-gray-400 font-bold py-1 bg-gray-50 border-b">우측 도어</div>
-    
-    <div className="flex-1 flex flex-col">
-        {/* 상단 */}
-        <div className="flex-1 border-b border-gray-100">
-            {renderItems(ZONES.FRIDGE_DOOR_RIGHT_1, '상')}
-        </div>
-        {/* 중단 */}
-        <div className="flex-1 border-b border-gray-100">
-            {renderItems(ZONES.FRIDGE_DOOR_RIGHT_2, '중')}
-        </div>
-        {/* 하단 */}
-        <div className="flex-1">
-            {renderItems(ZONES.FRIDGE_DOOR_RIGHT_3, '하')}
-        </div>
-    </div>
-</div>
+                <div className="text-[9px] text-center text-gray-400 font-bold py-1 bg-gray-50 border-b">우측 도어</div>
+                 <div className="flex-1 flex flex-col">
+                    <div className="flex-1 border-b border-gray-100">{renderItems(ZONES.FRIDGE_DOOR_RIGHT_1, '상')}</div>
+                    <div className="flex-1 border-b border-gray-100">{renderItems(ZONES.FRIDGE_DOOR_RIGHT_2, '중')}</div>
+                    <div className="flex-1">{renderItems(ZONES.FRIDGE_DOOR_RIGHT_3, '하')}</div>
+                </div>
+            </div>
         </div>
 
-        {/* 2️⃣ 하단: 냉동실 (40% 높이) */}
-        <div className="flex-[2] flex bg-blue-100/10">
-            {/* 좌측 냉동 (도어 + 3단 서랍) */}
+        {/* 2️⃣ 하단: 냉동실 (기존 flex-[2] -> flex-[4.5]로 대폭 확대) */}
+        <div className="flex-[4.5] flex bg-blue-100/10">
+            {/* 좌측 냉동 */}
             <div className="flex-1 flex border-r-4 border-gray-300">
                 <div className="w-[25%] border-r border-blue-100 bg-blue-50/30 flex flex-col">
-                     <div className="text-[8px] text-center text-blue-300 font-bold py-1">좌측 도어</div>
-                     {renderItems(ZONES.FREEZER_LEFT_DOOR)}
+                     <div className="flex-1 border-b border-blue-100">{renderItems(ZONES.FREEZER_LEFT_DOOR_1, '도어(상)')}</div>
+                     <div className="flex-1">{renderItems(ZONES.FREEZER_LEFT_DOOR_2, '도어(하)')}</div>
                 </div>
+                {/* 🌟 서랍 3단 분할 코드 (테두리 점선으로 구분) */}
                 <div className="flex-1 flex flex-col">
-                    <div className="flex-1 border-b border-blue-100 relative"><span className="absolute top-0 right-1 text-[8px] text-blue-200">좌측 서랍 1</span>{renderItems(ZONES.FREEZER_LEFT_1)}</div>
-                    <div className="flex-1 border-b border-blue-100 relative"><span className="absolute top-0 right-1 text-[8px] text-blue-200">좌측 서랍 2</span>{renderItems(ZONES.FREEZER_LEFT_2)}</div>
-                    <div className="flex-1 relative"><span className="absolute top-0 right-1 text-[8px] text-blue-200">좌측 서랍 3</span>{renderItems(ZONES.FREEZER_LEFT_3)}</div>
+                    <div className="flex-1 border-b-2 border-dashed border-blue-200">{renderItems(ZONES.FREEZER_LEFT_1, '서랍 1 (상)')}</div>
+                    <div className="flex-1 border-b-2 border-dashed border-blue-200">{renderItems(ZONES.FREEZER_LEFT_2, '서랍 2 (중)')}</div>
+                    <div className="flex-1">{renderItems(ZONES.FREEZER_LEFT_3, '서랍 3 (하)')}</div>
                 </div>
             </div>
 
-            {/* 우측 냉동 (도어 + 3단 서랍) */}
+            {/* 우측 냉동 */}
             <div className="flex-1 flex">
+                 {/* 🌟 서랍 3단 분할 코드 */}
                  <div className="flex-1 flex flex-col border-r border-blue-100">
-                    <div className="flex-1 border-b border-blue-100 relative"><span className="absolute top-0 left-1 text-[8px] text-blue-200">우측 서랍 1</span>{renderItems(ZONES.FREEZER_RIGHT_1)}</div>
-                    <div className="flex-1 border-b border-blue-100 relative"><span className="absolute top-0 left-1 text-[8px] text-blue-200">우측 서랍 2</span>{renderItems(ZONES.FREEZER_RIGHT_2)}</div>
-                    <div className="flex-1 relative"><span className="absolute top-0 left-1 text-[8px] text-blue-200">우측 서랍 3</span>{renderItems(ZONES.FREEZER_RIGHT_3)}</div>
+                    <div className="flex-1 border-b-2 border-dashed border-blue-200">{renderItems(ZONES.FREEZER_RIGHT_1, '서랍 1 (상)')}</div>
+                    <div className="flex-1 border-b-2 border-dashed border-blue-200">{renderItems(ZONES.FREEZER_RIGHT_2, '서랍 2 (중)')}</div>
+                    <div className="flex-1">{renderItems(ZONES.FREEZER_RIGHT_3, '서랍 3 (하)')}</div>
                 </div>
                 <div className="w-[25%] bg-blue-50/30 flex flex-col">
-                     <div className="text-[8px] text-center text-blue-300 font-bold py-1">우측 도어</div>
-                     {renderItems(ZONES.FREEZER_RIGHT_DOOR)}
+                     <div className="flex-1 border-b border-blue-100">{renderItems(ZONES.FREEZER_RIGHT_DOOR_1, '도어(상)')}</div>
+                     <div className="flex-1">{renderItems(ZONES.FREEZER_RIGHT_DOOR_2, '도어(하)')}</div>
                 </div>
             </div>
         </div>
       </div>
-
-      {/* 3️⃣ 실온 / 팬트리 */}
-      <div className="mt-4 bg-orange-50 border-2 border-dashed border-orange-200 rounded-xl p-3 min-h-[80px]">
+      
+      {/* 3️⃣ 실온 / 팬트리 (기존 유지) */}
+      <div className="mt-4 bg-orange-50 border-2 border-dashed border-orange-200 rounded-xl p-3 min-h-[100px]">
           <h3 className="text-xs font-bold text-orange-600 mb-2">🏠 실온 보관 / 팬트리</h3>
           <div className="flex flex-wrap gap-2">
-            {renderItems(ZONES.PANTRY)}
+            {renderItems(ZONES.PANTRY, null).props.children[1]}
           </div>
       </div>
     </div>
   );
 }
+       
