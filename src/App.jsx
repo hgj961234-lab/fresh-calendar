@@ -214,6 +214,11 @@ const ZONES = {
   FRIDGE_DOOR_RIGHT_1: '🚪 냉장실: 우측 도어 (상)',
   FRIDGE_DOOR_RIGHT_2: '🚪 냉장실: 우측 도어 (중)',
   FRIDGE_DOOR_RIGHT_3: '🚪 냉장실: 우측 도어 (하)',
+  FREEZER_LEFT_DOOR_1: '❄️ 냉동실: 좌측 도어 (상)', // 👈 [추가]
+  FREEZER_LEFT_DOOR_2: '❄️ 냉동실: 좌측 도어 (하)', // 👈 [추가]
+  FREEZER_RIGHT_DOOR_1: '❄️ 냉동실: 우측 도어 (상)', // 👈 [추가]
+  FREEZER_RIGHT_DOOR_2: '❄️ 냉동실: 우측 도어 (하)', // 👈 [추가]
+  FREEZER_LEFT_1: '❄️ 냉동실: 좌측 서랍 (상)',
   FREEZER_LEFT_1: '❄️ 냉동실: 좌측 서랍 (상)',
   FREEZER_LEFT_2: '❄️ 냉동실: 좌측 서랍 (중)',
   FREEZER_LEFT_3: '❄️ 냉동실: 좌측 서랍 (하)',
@@ -2496,8 +2501,9 @@ function RecipeView({ ingredients, onAddToCart, recipes, user, onNavigateToTheor
   }, [selectedRecipe, ingredients]);
 
   const matchIngredient = (r, u) => { 
-      const rr = r.replace(/\s/g,'');
-      const uu = u.replace(/\s/g,''); 
+      if (!r || !u) return false; // 데이터가 없으면 즉시 false 반환
+      const rr = String(r).replace(/\s/g,'');
+      const uu = String(u).replace(/\s/g,''); 
       if(rr === uu) return true; 
       return rr.includes(uu) || uu.includes(rr); 
   };
