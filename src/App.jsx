@@ -1574,12 +1574,12 @@ function AppContent({ user }) {
   const handleNavigateToRecipe = (recipeId) => {
       const target = RECIPE_FULL_DB.find(r => r.id === recipeId);
       if (target) {
-          setSelectedRecipe(target); // 1. 목표 레시피를 선택 상태로 설정
-          setActiveTab('recipes');   // 2. 화면을 레시피 탭으로 전환
+          setSelectedRecipe(target); 
+          setActiveTab('recipes');   
       } else {
           toast.error("레시피를 찾을 수 없습니다.");
-      } // 👈 [복구 1] else 문 닫기
-  }; //
+      } 
+  }; // 👈 여기에 닫는 괄호와 세미콜론이 꼭 있어야 합니다!
 
   const handleGoToTheory = (theoryId) => {
         setSelectedTheoryId(theoryId);
