@@ -12,7 +12,7 @@ import {
 import { Toaster, toast } from 'react-hot-toast'; // 👈 [추가] 토스트 알림
 
 // --- FIREBASE IMPORTS ---
-import { initializeApp } from "firebase/app";
+import { initializeApp, getApps, getApp } from "firebase/app";
 import { 
   getAuth, 
   signInWithEmailAndPassword, 
@@ -48,7 +48,8 @@ const firebaseConfig = {
 // Firebase 초기화
 let app, auth, db;
 try {
-  app = initializeApp(firebaseConfig);
+  // 👇 [수정] 앱이 이미 있으면 가져오고, 없으면 초기화 (Strict Mode 안전장치)
+  app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
   auth = getAuth(app);
   db = getFirestore(app);
 } catch (e) {
@@ -1080,79 +1081,6 @@ function DesktopSidebar({ activeTab, setActiveTab, cartCount, onReset, onLogout,
   );
 }
 
-// --- 2. 통계 뷰 (PC 가로 배치 수정됨) ---
-function InsightsView({ ingredients, onAddToCart, history, onResetHistory }) {
-  const totalUsed = history.filter(h => h.action === 'used').reduce((sum, item) => sum + (item.price || 0), 0);
-  const totalWasted = history.filter(h => h.action === 'wasted').reduce((sum, item) => sum + (item.price || 0), 0);
-  const rawSavings = Math.round(totalUsed * 0.6);
-  const netSavings = rawSavings - totalWasted;
-  
-  const usageCounts = history.filter(h => h.action === 'used').reduce((acc, item) => {
-      acc[item.name] = (acc[item.name] || 0) + 1;
-      return acc;
-  }, {});
-  const rankedItems = Object.entries(usageCounts).sort(([,a], [,b]) => b - a).slice(0, 5);
-  const formatMoney = (amount) => new Intl.NumberFormat('ko-KR').format(amount);
-
-  return (
-    <div className="p-4 pb-20 animate-in fade-in duration-500">
-      <div className="flex justify-between items-center mb-4">
-        <h2 className="text-lg font-bold flex items-center gap-2 text-gray-800">
-          <BarChart2 className="text-green-600" /> 통계 및 분석
-        </h2>
-        <button onClick={onResetHistory} className="text-xs bg-gray-100 text-gray-500 px-3 py-1.5 rounded-lg flex items-center gap-1 hover:bg-red-50 hover:text-red-600 transition-colors">
-          <RefreshCcw size={12} /> 기록 초기화
-        </button>
-      </div>
-      
-      {/* 🟢 [수정됨] PC에서는 가로(grid-cols-3), 모바일은 세로(grid-cols-1) 배치 */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-      
-          {/* 카드 1: 절약 금액 */}
-          <div className={`p-6 rounded-3xl shadow-lg text-white relative overflow-hidden transition-colors ${netSavings >= 0 ? 'bg-gradient-to-br from-green-500 to-green-700' : 'bg-gradient-to-br from-red-500 to-red-700'}`}>
-            <div className="absolute top-0 right-0 p-8 opacity-10"><DollarSign size={100} /></div>
-            <div className="relative z-10">
-              <h3 className="font-medium text-green-100 mb-1 flex items-center gap-2">이번 달 순수 절약</h3>
-              <div className="text-3xl font-bold mb-4 flex items-baseline gap-1">
-                {formatMoney(netSavings)}<span className="text-sm font-normal">원</span>
-              </div>
-              <div className="bg-white/20 rounded-xl p-3 backdrop-blur-sm text-sm space-y-2">
-                 <div className="flex justify-between"><span>+사용</span><span>{formatMoney(rawSavings)}</span></div>
-                 <div className="flex justify-between text-red-100"><span>-폐기</span><span>{formatMoney(totalWasted)}</span></div>
-              </div>
-            </div>
-          </div>
-
-          {/* 카드 2: 현재 상태 */}
-          <div className="bg-white p-5 rounded-2xl border shadow-sm flex flex-col justify-center">
-            <h3 className="text-sm font-bold text-gray-500 mb-3 flex items-center gap-1"><PieChart size={14} /> 냉장고 현황</h3>
-            <div className="flex items-center justify-between px-2">
-                <div className="text-center"><div className="text-2xl font-bold text-green-600">{ingredients.length}</div><div className="text-xs text-gray-400">보관</div></div>
-                <div className="h-8 w-[1px] bg-gray-200"></div>
-                <div className="text-center"><div className="text-2xl font-bold text-blue-500">{history.filter(h=>h.action==='used').length}</div><div className="text-xs text-gray-400">소비</div></div>
-                <div className="h-8 w-[1px] bg-gray-200"></div>
-                <div className="text-center"><div className="text-2xl font-bold text-red-500">{history.filter(h=>h.action==='wasted').length}</div><div className="text-xs text-gray-400">폐기</div></div>
-            </div>
-          </div>
-
-          {/* 카드 3: 자주 먹은 재료 */}
-          <div className="bg-white p-5 rounded-2xl border shadow-sm">
-            <h3 className="text-sm font-bold text-gray-500 mb-4 flex items-center gap-1"><TrendingUp size={14} /> 자주 먹은 재료</h3>
-            <div className="space-y-3 max-h-40 overflow-y-auto pr-1">
-              {rankedItems.length > 0 ? rankedItems.map(([name, count], idx) => (
-                <div key={idx} className="flex justify-between items-center text-xs">
-                    <span className="font-bold text-gray-700">{idx+1}. {name}</span>
-                    <span className="text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">{count}회</span>
-                </div>
-              )) : <div className="text-center text-gray-400 text-xs py-4">기록 없음</div>}
-            </div>
-          </div>
-
-      </div>
-    </div>
-  );
-}
-
 // --- 3. 메인 AppContent (다크모드 제거 & 기능 연결 완료) ---
 function AppContent({ user }) {
   const [activeTab, setActiveTab] = useState('calendar');
@@ -1210,7 +1138,11 @@ function AppContent({ user }) {
       return diffDays >= 0 && diffDays <= 3;
     });
     if (urgentItems.length > 0) {
-      new Notification("Fresh Calendar 🚨", { body: `${urgentItems[0].name} 외 ${urgentItems.length - 1}개 재료의 유통기한이 임박했습니다!` });
+      // 👇 [수정] 1개일 때와 여러 개일 때 문구 분리
+      const msg = urgentItems.length === 1 
+        ? `${urgentItems[0].name}의 유통기한이 임박했습니다!` 
+        : `${urgentItems[0].name} 외 ${urgentItems.length - 1}개 재료의 유통기한이 임박했습니다!`;
+      new Notification("Fresh Calendar 🚨", { body: msg });
     }
   };
 
@@ -1350,6 +1282,7 @@ function AppContent({ user }) {
         batch.set(newRef, {
           name: item.name, 
           category: storage, 
+          location: getRecommendedZone(item.name, storage), // 👈 [수정] 지도 뷰를 위해 위치 정보 자동 할당
           expiry: expiry, 
           addedDate: new Date(),
           price: item.price !== undefined ? Number(item.price) : (dbEntry.price || 0),
@@ -1494,7 +1427,9 @@ function CalendarView({ ingredients, getRiskLevel, onAddRequest, onDateSelect })
         {Array.from({length: daysInMonth}).map((_, i) => {
           const day = i + 1;
           const dayItems = getItemsForDate(day);
-          const isToday = day === new Date().getDate() && month === new Date().getMonth();
+          // 👇 [수정] 연도(FullYear)까지 비교해야 정확한 '오늘'이 표시됨
+          const now = new Date();
+          const isToday = day === now.getDate() && month === now.getMonth() && year === now.getFullYear();
           return (
             <div key={day} onClick={() => { 
                 setSelectedDayInfo({ day, items: dayItems, dateObj: new Date(year, month, day) });
@@ -1552,7 +1487,11 @@ function FridgeListView({ ingredients, getRiskLevel, moveToTrash, consumeItem, u
   });
   
   const toggleSelect = (id) => { if (selectedIds.includes(id)) setSelectedIds(selectedIds.filter(itemId => itemId !== id)); else setSelectedIds([...selectedIds, id]); };
-  const toggleSelectAll = () => { if (selectedIds.length === ingredients.length && ingredients.length > 0) setSelectedIds([]); else setSelectedIds(ingredients.map(i => i.id)); };
+  const toggleSelectAll = () => { 
+    // 👇 [수정] ingredients(전체)가 아니라 sorted(현재 필터링된 목록)를 기준으로 선택
+    if (selectedIds.length === sorted.length && sorted.length > 0) setSelectedIds([]); 
+    else setSelectedIds(sorted.map(i => i.id)); 
+  };
   const handleWasteSelected = (e) => { e.stopPropagation(); if (selectedIds.length === 0) return; moveToTrash(selectedIds); setSelectedIds([]); toast.success('비워냈습니다!'); };
   const handleConsumeSelected = (e) => { e.stopPropagation(); if (selectedIds.length === 0) return; consumeItem(selectedIds); setSelectedIds([]); toast.success('맛있게 드셨군요! 😋'); };
 
@@ -1663,7 +1602,8 @@ function AddItemModal({ onClose, onAdd, initialDate }) {
   const [expiry, setExpiry] = useState(
     initialDate 
       ? new Date(initialDate.getTime() - (initialDate.getTimezoneOffset() * 60000)).toISOString().split('T')[0] 
-      : new Date().toISOString().split('T')[0]
+      // 👇 [수정] 현재 시간(new Date())도 로컬 타임존 오프셋을 적용하여 한국 오전 시간대 오류 방지
+      : new Date(Date.now() - (new Date().getTimezoneOffset() * 60000)).toISOString().split('T')[0]
   );
   const [price, setPrice] = useState('');
   const [amount, setAmount] = useState('');
@@ -2287,18 +2227,18 @@ function RecipeView({ ingredients, onAddToCart, recipes, user }) {
   );
 }
   
-// --- NEW: 실제 데이터 기반 통계 뷰 ---
+// --- NEW: 실제 데이터 기반 통계 뷰 (원클릭 재구매 버튼 추가됨) ---
 function InsightsView({ ingredients, onAddToCart, history, onResetHistory }) {
   const totalUsed = history.filter(h => h.action === 'used').reduce((sum, item) => sum + (item.price || 0), 0);
   const totalWasted = history.filter(h => h.action === 'wasted').reduce((sum, item) => sum + (item.price || 0), 0);
   const rawSavings = Math.round(totalUsed * 0.6);
   const netSavings = rawSavings - totalWasted;
+  
   const usageCounts = history.filter(h => h.action === 'used').reduce((acc, item) => {
       acc[item.name] = (acc[item.name] || 0) + 1;
       return acc;
   }, {});
   const rankedItems = Object.entries(usageCounts).sort(([,a], [,b]) => b - a).slice(0, 5);
-  const maxCount = rankedItems.length > 0 ? rankedItems[0][1] : 1;
   const formatMoney = (amount) => new Intl.NumberFormat('ko-KR').format(amount);
 
   return (
@@ -2312,7 +2252,6 @@ function InsightsView({ ingredients, onAddToCart, history, onResetHistory }) {
         </button>
       </div>
       
-      {/* 🟢 [수정됨] PC에서는 가로(grid), 모바일은 세로(col) 배치 */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
       
           {/* 카드 1: 절약 금액 */}
@@ -2342,14 +2281,20 @@ function InsightsView({ ingredients, onAddToCart, history, onResetHistory }) {
             </div>
           </div>
 
-          {/* 카드 3: 자주 먹은 재료 */}
+          {/* 카드 3: 자주 먹은 재료 (여기에 + 버튼 추가됨) */}
           <div className="bg-white p-5 rounded-2xl border shadow-sm">
             <h3 className="text-sm font-bold text-gray-500 mb-4 flex items-center gap-1"><TrendingUp size={14} /> 자주 먹은 재료</h3>
             <div className="space-y-3 max-h-40 overflow-y-auto pr-1">
               {rankedItems.length > 0 ? rankedItems.map(([name, count], idx) => (
                 <div key={idx} className="flex justify-between items-center text-xs">
                     <span className="font-bold text-gray-700">{idx+1}. {name}</span>
-                    <span className="text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">{count}회</span>
+                    <div className="flex items-center gap-2">
+                        <span className="text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">{count}회</span>
+                        {/* 👇 [추가됨] 원클릭 장바구니 버튼 */}
+                        <button onClick={() => onAddToCart(name)} className="p-1 bg-green-50 text-green-600 rounded hover:bg-green-100 transition-colors" title="장바구니 담기">
+                            <Plus size={14} />
+                        </button>
+                    </div>
                 </div>
               )) : <div className="text-center text-gray-400 text-xs py-4">기록 없음</div>}
             </div>
