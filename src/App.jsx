@@ -1539,6 +1539,7 @@ function AppContent({ user }) {
   const [historyItems, setHistoryItems] = useState([]);
   const [selectedDateForAdd, setSelectedDateForAdd] = useState(null);
   const [selectedTheoryId, setSelectedTheoryId] = useState(null);
+  const [selectedRecipe, setSelectedRecipe] = useState(null);
 
   // 1. 데이터 구독 (Firebase)
   useEffect(() => {
@@ -1569,6 +1570,16 @@ function AppContent({ user }) {
     
     return () => { unsubIng(); unsubCart(); unsubTrash(); unsubHistory(); };
   }, [user]);
+
+  const handleNavigateToRecipe = (recipeId) => {
+      const target = RECIPE_FULL_DB.find(r => r.id === recipeId);
+      if (target) {
+          setSelectedRecipe(target); // 1. 목표 레시피를 선택 상태로 설정
+          setActiveTab('recipes');   // 2. 화면을 레시피 탭으로 전환
+      } else {
+          toast.error("레시피를 찾을 수 없습니다.");
+      } // 👈 [복구 1] else 문 닫기
+  }; //
 
   const handleGoToTheory = (theoryId) => {
         setSelectedTheoryId(theoryId);
@@ -1830,13 +1841,15 @@ function AppContent({ user }) {
             {activeTab === 'trash' && <TrashView trashItems={trashItems} onRestore={restoreFromTrash} onPermanentDelete={permanentDelete} onClose={() => setActiveTab('list')} />}
             
             {/* 👇 [수정된 부분] RecipeView에 onNavigateToTheory 속성을 추가했습니다. */}
-            {activeTab === 'recipes' && <RecipeView ingredients={ingredients} onAddToCart={addToCart} recipes={RECIPE_FULL_DB} user={user} onNavigateToTheory={handleGoToTheory} />} 
+            {activeTab === 'recipes' && <RecipeView ingredients={ingredients} onAddToCart={addToCart} recipes={RECIPE_FULL_DB} user={user} onNavigateToTheory={handleGoToTheory}selectedRecipe={selectedRecipe}       
+                setSelectedRecipe={setSelectedRecipe} />} 
             
             {activeTab === 'cart' && <ShoppingCartView cart={cart} ingredients={ingredients} onUpdateCount={updateCartCount} onRemove={removeItemsFromCart} onCheckout={checkoutCartItems} onUpdateDetail={updateCartItemDetail} onAdd={addToCart} />}
             {activeTab === 'stats' && <InsightsView ingredients={ingredients} onAddToCart={addToCart} history={historyItems} onResetHistory={resetHistory} />}
             
             {/* ✨ [추가된 부분] 이론 페이지 연결 ✨ */}
             {activeTab === 'theory' && <CookingTheoryView initialTheoryId={selectedTheoryId} onBack={() => setActiveTab('recipes')} />}
+              onNavigateToRecipe={handleNavigateToRecipe}
             {/* ------------------------------- */}
 
             {activeTab === 'add' && <AddItemModal onClose={() => setActiveTab('calendar')} onAdd={addItem} initialDate={selectedDateForAdd} />}
@@ -2479,7 +2492,6 @@ function RecipeView({ ingredients, onAddToCart, recipes, user, onNavigateToTheor
 
   // 리스트 필터링용 상태
   const [selectedIngredients, setSelectedIngredients] = useState([]);
-  const [selectedRecipe, setSelectedRecipe] = useState(null);
   
   // 상세화면용 상태
   const [ingredientsToBuy, setIngredientsToBuy] = useState([]);
@@ -2977,7 +2989,7 @@ function InsightsView({ ingredients, onAddToCart, history, onResetHistory }) {
 }
 
 // 🌟 [신규] 요리 과학 이론 뷰 컴포넌트
-function CookingTheoryView({ initialTheoryId, onBack }) {
+function CookingTheoryView({ initialTheoryId, onBack, onNavigateToRecipe }) {
   const [expandedId, setExpandedId] = useState(initialTheoryId || null);
 
   useEffect(() => {
@@ -3043,9 +3055,14 @@ function CookingTheoryView({ initialTheoryId, onBack }) {
                         const recipe = RECIPE_FULL_DB.find(r => r.id === rId);
                         if (!recipe) return null;
                         return (
-                          <span key={rId} className="text-xs bg-white border border-gray-200 px-2 py-1 rounded-lg text-gray-600 shadow-sm">
-                            {recipe.name}
-                          </span>
+                          <button 
+                            key={rId} 
+                            // 클릭하면 부모에게 "이 레시피로 이동시켜줘!"라고 요청
+                            onClick={() => onNavigateToRecipe(rId)}
+                            className="text-xs bg-white border border-gray-200 px-3 py-1.5 rounded-lg text-gray-600 shadow-sm hover:bg-green-50 hover:text-green-700 hover:border-green-300 transition-all flex items-center gap-1"
+                          >
+                            <ChefHat size={12}/> {recipe.name}
+                          </button>
                         );
                       })}
                     </div>
