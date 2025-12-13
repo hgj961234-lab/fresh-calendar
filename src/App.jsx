@@ -1848,8 +1848,7 @@ function AppContent({ user }) {
             {activeTab === 'stats' && <InsightsView ingredients={ingredients} onAddToCart={addToCart} history={historyItems} onResetHistory={resetHistory} />}
             
             {/* ✨ [추가된 부분] 이론 페이지 연결 ✨ */}
-            {activeTab === 'theory' && <CookingTheoryView initialTheoryId={selectedTheoryId} onBack={() => setActiveTab('recipes')} />}
-              onNavigateToRecipe={handleNavigateToRecipe}
+            {activeTab === 'theory' && <CookingTheoryView initialTheoryId={selectedTheoryId} onBack={() => setActiveTab('recipes')} onNavigateToRecipe={handleNavigateToRecipe} />}
             {/* ------------------------------- */}
 
             {activeTab === 'add' && <AddItemModal onClose={() => setActiveTab('calendar')} onAdd={addItem} initialDate={selectedDateForAdd} />}
