@@ -195,8 +195,30 @@ const SHELF_LIFE_DB = {
   '물엿': { pantry: 365, price: 3500, unit: '700g', risk: { danger: 30, warning: 60 } },
   '올리고당': { pantry: 365, price: 4500, unit: '700g', risk: { danger: 30, warning: 60 } },
    
-  // 기본값 (가격 업데이트)
+  // [바꿀 코드] (ZONES 상수 정의 추가)
   'default': { fridge: 7, price: 3000, unit: '1개', risk: { danger: 2, warning: 4 } }
+};
+
+// 🌟 [필수 추가] 누락되었던 ZONES 상수 정의 (지도 뷰 에러 해결)
+const ZONES = {
+  FRIDGE_MAIN_1: '🥘 냉장실: 메인 선반 (상)',
+  FRIDGE_MAIN_2: '🥘 냉장실: 메인 선반 (중)',
+  FRIDGE_MAIN_3: '🥘 냉장실: 메인 선반 (하)',
+  FRIDGE_FRESH_1: '🥬 냉장실: 신선야채실 (좌)',
+  FRIDGE_FRESH_2: '🥬 냉장실: 신선야채실 (우)',
+  FRIDGE_MULTI_1: '🥓 냉장실: 멀티수납코너 (좌)',
+  FRIDGE_MULTI_2: '🥓 냉장실: 멀티수납코너 (우)',
+  FRIDGE_DOOR_LEFT: '🚪 냉장실: 좌측 도어',
+  FRIDGE_DOOR_RIGHT: '🚪 냉장실: 우측 도어',
+  FREEZER_LEFT_DOOR: '❄️ 냉동실: 좌측 도어',
+  FREEZER_RIGHT_DOOR: '❄️ 냉동실: 우측 도어',
+  FREEZER_LEFT_1: '❄️ 냉동실: 좌측 서랍 (상)',
+  FREEZER_LEFT_2: '❄️ 냉동실: 좌측 서랍 (중)',
+  FREEZER_LEFT_3: '❄️ 냉동실: 좌측 서랍 (하)',
+  FREEZER_RIGHT_1: '❄️ 냉동실: 우측 서랍 (상)',
+  FREEZER_RIGHT_2: '❄️ 냉동실: 우측 서랍 (중)',
+  FREEZER_RIGHT_3: '❄️ 냉동실: 우측 서랍 (하)',
+  PANTRY: '🏠 실온: 다용도실/팬트리'
 };
 
 // 🌟 [신규] LG 4도어 냉장고 맞춤 위치 추천 알고리즘 (모든 DB 재료 포함)
@@ -1230,7 +1252,8 @@ function AppContent({ user }) {
       const msg = urgentItems.length === 1 
         ? `${urgentItems[0].name}의 유통기한이 임박했습니다!` 
         : `${urgentItems[0].name} 외 ${urgentItems.length - 1}개 재료의 유통기한이 임박했습니다!`;
-      new Notification("Fresh Calendar 🚨", { body: msg });
+      const noti = new Notification("Fresh Calendar 🚨", { body: msg });
+    noti.onclick = () => window.focus(); // 👈 알림 클릭 시 창 활성화
     }
   };
 
@@ -1370,7 +1393,7 @@ function AppContent({ user }) {
         batch.set(newRef, {
           name: item.name, 
           category: storage, 
-          location: getRecommendedZone(item.name, storage), // 👈 [수정] 지도 뷰를 위해 위치 정보 자동 할당
+          location: item.location || getRecommendedZone(item.name, storage), // 👈 사용자가 지정한 위치 우선, 없으면 추천 위치
           expiry: expiry, 
           addedDate: new Date(),
           price: item.price !== undefined ? Number(item.price) : (dbEntry.price || 0),
@@ -1438,7 +1461,7 @@ function AppContent({ user }) {
 
           <main className="flex-1 overflow-y-auto bg-gray-50 relative scroll-smooth">
             {activeTab === 'calendar' && <CalendarView ingredients={ingredients} getRiskLevel={getRiskLevel} onDateSelect={(d) => setSelectedDateForAdd(d)} onAddRequest={(d) => { setSelectedDateForAdd(d); setActiveTab('add'); }} />}
-            {activeTab === 'list' && <FridgeListView ingredients={ingredients} getRiskLevel={getRiskLevel} moveToTrash={moveToTrash} consumeItem={consumeItem} updateIngredient={updateIngredient} onOpenTrash={() => setActiveTab('trash')} />}
+            {activeTab === 'list' && <FridgeListView ingredients={ingredients} getRiskLevel={getRiskLevel} moveToTrash={moveToTrash} consumeItem={consumeItem} updateIngredient={updateIngredient} onOpenTrash={() => setActiveTab('trash')} onAddRequest={() => { setSelectedDateForAdd(new Date()); setActiveTab('add'); }} />}
             {activeTab === 'trash' && <TrashView trashItems={trashItems} onRestore={restoreFromTrash} onPermanentDelete={permanentDelete} onClose={() => setActiveTab('list')} />}
             {activeTab === 'recipes' && <RecipeView ingredients={ingredients} onAddToCart={addToCart} recipes={RECIPE_FULL_DB} user={user} />} 
             {activeTab === 'cart' && <ShoppingCartView cart={cart} ingredients={ingredients} onUpdateCount={updateCartCount} onRemove={removeItemsFromCart} onCheckout={checkoutCartItems} onUpdateDetail={updateCartItemDetail} onAdd={addToCart} />}
@@ -1555,12 +1578,12 @@ function CalendarView({ ingredients, getRiskLevel, onAddRequest, onDateSelect })
 }
 
 // --- 냉장고 목록 뷰 (필터 & 정렬 추가 버전) ---
-function FridgeListView({ ingredients, getRiskLevel, moveToTrash, consumeItem, updateIngredient, onOpenTrash }) {
-  const [filter, setFilter] = useState('all'); 
-  const [sort, setSort] = useState('expiry');  
+function FridgeListView({ ingredients, getRiskLevel, moveToTrash, consumeItem, updateIngredient, onOpenTrash, onAddRequest }) {
+  const [filter, setFilter] = useState('all');
+  const [sort, setSort] = useState('expiry');
   const [selectedIds, setSelectedIds] = useState([]);
-  const [viewMode, setViewMode] = useState('list'); // 👈 보기 모드 추가 (list/map)
-  const [editingItem, setEditingItem] = useState(null); // 👈 수정 모달용 상태 추가
+  const [viewMode, setViewMode] = useState('list');
+  const [editingItem, setEditingItem] = useState(null);
 
   const filtered = ingredients.filter(item => {
     if (filter === 'all') return true;
@@ -1573,13 +1596,14 @@ function FridgeListView({ ingredients, getRiskLevel, moveToTrash, consumeItem, u
     if (sort === 'newest') return (b.addedDate || 0) - (a.addedDate || 0);
     return 0;
   });
-  
+
   const toggleSelect = (id) => { if (selectedIds.includes(id)) setSelectedIds(selectedIds.filter(itemId => itemId !== id)); else setSelectedIds([...selectedIds, id]); };
+  
   const toggleSelectAll = () => { 
-    // 👇 [수정] ingredients(전체)가 아니라 sorted(현재 필터링된 목록)를 기준으로 선택
     if (selectedIds.length === sorted.length && sorted.length > 0) setSelectedIds([]); 
     else setSelectedIds(sorted.map(i => i.id)); 
   };
+
   const handleWasteSelected = (e) => { e.stopPropagation(); if (selectedIds.length === 0) return; moveToTrash(selectedIds); setSelectedIds([]); toast.success('비워냈습니다!'); };
   const handleConsumeSelected = (e) => { e.stopPropagation(); if (selectedIds.length === 0) return; consumeItem(selectedIds); setSelectedIds([]); toast.success('맛있게 드셨군요! 😋'); };
 
@@ -1592,57 +1616,61 @@ function FridgeListView({ ingredients, getRiskLevel, moveToTrash, consumeItem, u
             <button onClick={() => setViewMode('list')} className={`px-3 py-1.5 rounded-md text-xs font-bold flex items-center gap-1 transition-all ${viewMode === 'list' ? 'bg-white shadow text-gray-800' : 'text-gray-400'}`}><Menu size={14}/> 목록</button>
             <button onClick={() => setViewMode('map')} className={`px-3 py-1.5 rounded-md text-xs font-bold flex items-center gap-1 transition-all ${viewMode === 'map' ? 'bg-white shadow text-blue-600' : 'text-gray-400'}`}><LayoutGrid size={14}/> 지도</button>
         </div>
-        <button onClick={onOpenTrash} className="p-2 text-gray-400 hover:text-red-500 bg-white rounded-full border border-gray-100 shadow-sm"><Trash2 size={18} /></button>
+        <div className="flex gap-2">
+            {/* 수정됨: 함수 호출 형태로 전달하여 이벤트 객체 오류 방지 */}
+            <button onClick={() => onAddRequest(new Date())} className="p-2 bg-green-600 text-white rounded-full hover:bg-green-700 shadow-sm"><Plus size={18} /></button>
+            <button onClick={onOpenTrash} className="p-2 text-gray-400 hover:text-red-500 bg-white rounded-full border border-gray-100 shadow-sm"><Trash2 size={18} /></button>
+        </div>
       </div>
 
       {viewMode === 'map' ? (
         <FridgeMap ingredients={ingredients} onItemClick={(item) => setEditingItem(item)} />
-    ) : (
-      <>
-        {/* 필터 & 정렬 */}
-        <div className="flex flex-col gap-3 mb-4">
-           {/* ... (기존 필터 코드 유지) ... */}
-           <div className="flex bg-gray-100 p-1 rounded-xl">
-             {['all', 'fridge', 'freezer', 'pantry'].map(f => (<button key={f} onClick={() => setFilter(f)} className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${filter === f ? 'bg-white text-green-700 shadow-sm' : 'text-gray-400'}`}>{f === 'all' ? '전체' : f === 'fridge' ? '냉장' : f === 'freezer' ? '냉동' : '실온'}</button>))}
-           </div>
-           <div className="flex justify-end">
-               <select value={sort} onChange={e => setSort(e.target.value)} className="bg-white border border-gray-200 text-xs font-bold px-3 py-1.5 rounded-lg outline-none text-gray-600">
-                   <option value="expiry">⏳ 유통기한 급한순</option><option value="newest">✨ 최근 등록순</option><option value="name">가나다 이름순</option>
-               </select>
-           </div>
-        </div>
+      ) : (
+        <>
+          {/* 필터 & 정렬 */}
+          <div className="flex flex-col gap-3 mb-4">
+            <div className="flex bg-gray-100 p-1 rounded-xl">
+              {['all', 'fridge', 'freezer', 'pantry'].map(f => (<button key={f} onClick={() => setFilter(f)} className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${filter === f ? 'bg-white text-green-700 shadow-sm' : 'text-gray-400'}`}>{f === 'all' ? '전체' : f === 'fridge' ? '냉장' : f === 'freezer' ? '냉동' : '실온'}</button>))}
+            </div>
+            <div className="flex justify-end">
+                <select value={sort} onChange={e => setSort(e.target.value)} className="bg-white border border-gray-200 text-xs font-bold px-3 py-1.5 rounded-lg outline-none text-gray-600">
+                    <option value="expiry">⏳ 유통기한 급한순</option><option value="newest">✨ 최근 등록순</option><option value="name">가나다 이름순</option>
+                </select>
+            </div>
+          </div>
 
-        {/* 선택 액션 및 리스트 */}
-        <div className="flex gap-2 mb-4">
-             <button onClick={toggleSelectAll} className="text-xs bg-white border border-gray-200 text-gray-600 px-3 py-2.5 rounded-xl font-bold flex items-center gap-1 shadow-sm flex-1 justify-center">{selectedIds.length === sorted.length && sorted.length > 0 ? <CheckSquare size={14} className="text-green-600" /> : <Square size={14} />} 전체</button>
-             {selectedIds.length > 0 && (<><button onClick={handleConsumeSelected} className="text-xs bg-green-600 text-white px-3 py-2.5 rounded-xl font-bold shadow-md flex-[2] flex items-center justify-center gap-1"><Utensils size={14} /> 먹었어요</button><button onClick={handleWasteSelected} className="text-xs bg-red-100 text-red-600 px-3 py-2.5 rounded-xl font-bold shadow-sm flex-1 flex items-center justify-center gap-1"><Trash2 size={14} /> 버릴래요</button></>)}
-        </div>
+          {/* 선택 액션 및 리스트 */}
+          <div className="flex gap-2 mb-4">
+              <button onClick={toggleSelectAll} className="text-xs bg-white border border-gray-200 text-gray-600 px-3 py-2.5 rounded-xl font-bold flex items-center gap-1 shadow-sm flex-1 justify-center">{selectedIds.length === sorted.length && sorted.length > 0 ? <CheckSquare size={14} className="text-green-600" /> : <Square size={14} />} 전체</button>
+              {selectedIds.length > 0 && (<><button onClick={handleConsumeSelected} className="text-xs bg-green-600 text-white px-3 py-2.5 rounded-xl font-bold shadow-md flex-[2] flex items-center justify-center gap-1"><Utensils size={14} /> 먹었어요</button><button onClick={handleWasteSelected} className="text-xs bg-red-100 text-red-600 px-3 py-2.5 rounded-xl font-bold shadow-sm flex-1 flex items-center justify-center gap-1"><Trash2 size={14} /> 버릴래요</button></>)}
+          </div>
 
-        <div className="space-y-3">
-          {sorted.map(item => {
-              const risk = getRiskLevel(item.expiry, item.name);
-              const diff = item.expiry ? Math.ceil((item.expiry - new Date().setHours(0,0,0,0)) / (86400000)) : 0;
-              const isSelected = selectedIds.includes(item.id);
-              return (
-              <div key={item.id} className={`bg-white p-4 rounded-2xl border border-gray-100 shadow-sm transition-all flex items-center justify-between group cursor-pointer ${isSelected ? 'ring-2 ring-green-500 bg-green-50' : 'hover:border-green-300'}`}>
-                  <div className="flex items-center gap-3 flex-1">
-                    <div className="cursor-pointer p-1" onClick={(e) => { e.stopPropagation(); toggleSelect(item.id); }}>{isSelected ? <CheckSquare size={20} className="text-green-600"/> : <Square size={20} className="text-gray-300"/>}</div>
-                    <div className="flex-1 cursor-pointer" onClick={() => setEditingItem(item)}>
-                      <div className={`w-1.5 h-10 rounded-full float-left mr-3 ${risk === 'danger' ? 'bg-red-500' : risk === 'warning' ? 'bg-yellow-400' : 'bg-green-400'}`}></div>
-                      <div>
-                        <h3 className="font-bold text-gray-800 flex items-center gap-1">{item.name} <span className="text-[9px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded border truncate max-w-[100px]">{item.location ? item.location.split(':')[0] : item.category}</span></h3>
-                        <p className={`text-xs mt-0.5 ${risk === 'danger' ? 'text-red-500 font-bold' : 'text-gray-500'}`}>{diff < 0 ? '만료됨' : diff === 0 ? '오늘 만료' : `D-${diff}`}</p>
+          <div className="space-y-3">
+            {sorted.map(item => {
+                const risk = getRiskLevel(item.expiry, item.name);
+                // 수정됨: Date 타입 변환 후 연산
+                const diff = item.expiry ? Math.ceil((new Date(item.expiry).getTime() - new Date().setHours(0,0,0,0)) / (86400000)) : 0;
+                const isSelected = selectedIds.includes(item.id);
+                return (
+                <div key={item.id} className={`bg-white p-4 rounded-2xl border border-gray-100 shadow-sm transition-all flex items-center justify-between group cursor-pointer ${isSelected ? 'ring-2 ring-green-500 bg-green-50' : 'hover:border-green-300'}`}>
+                    <div className="flex items-center gap-3 flex-1">
+                      <div className="cursor-pointer p-1" onClick={(e) => { e.stopPropagation(); toggleSelect(item.id); }}>{isSelected ? <CheckSquare size={20} className="text-green-600"/> : <Square size={20} className="text-gray-300"/>}</div>
+                      <div className="flex-1 cursor-pointer" onClick={() => setEditingItem(item)}>
+                        <div className={`w-1.5 h-10 rounded-full float-left mr-3 ${risk === 'danger' ? 'bg-red-500' : risk === 'warning' ? 'bg-yellow-400' : 'bg-green-400'}`}></div>
+                        <div>
+                          <h3 className="font-bold text-gray-800 flex items-center gap-1">{item.name} <span className="text-[9px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded border truncate max-w-[100px]">{item.location ? item.location.split(':')[0] : item.category}</span></h3>
+                          <p className={`text-xs mt-0.5 ${risk === 'danger' ? 'text-red-500 font-bold' : 'text-gray-500'}`}>{diff < 0 ? '만료됨' : diff === 0 ? '오늘 만료' : `D-${diff}`}</p>
+                        </div>
                       </div>
                     </div>
-                  </div>
-              </div>
-              );
-          })}
-          {sorted.length === 0 && <div className="text-center py-20 text-gray-400">표시할 재료가 없어요.<br/>필터를 변경해보세요!</div>}
-        </div>
-      </>
-    )}
-    {editingItem && <EditIngredientModal item={editingItem} onClose={() => setEditingItem(null)} onUpdate={updateIngredient} />}
+                </div>
+                );
+            })}
+            {sorted.length === 0 && <div className="text-center py-20 text-gray-400">표시할 재료가 없어요.<br/>필터를 변경해보세요!</div>}
+          </div>
+        </>
+      )}
+      {editingItem && <EditIngredientModal item={editingItem} onClose={() => setEditingItem(null)} onUpdate={updateIngredient} />}
     </div>
   );
 }
@@ -1746,7 +1774,8 @@ function AddItemModal({ onClose, onAdd, initialDate }) {
         
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-xl font-bold text-gray-800">새 재료 추가</h2>
-          <button onClick={onClose} className="p-2 bg-gray-100 bg-gray-700 rounded-full text-gray-500 hover:bg-gray-200 transition-colors">
+          {/* bg-gray-700 앞에 dark: 접두사 추가 */}
+          <button onClick={onClose} className="p-2 bg-gray-100 dark:bg-gray-700 rounded-full text-gray-500 hover:bg-gray-200 transition-colors">
             <X size={20} className="dark:text-white"/>
           </button>
         </div>
@@ -1871,7 +1900,14 @@ function ShoppingCartView({ cart, ingredients, onUpdateCount, onRemove, onChecko
   const handleManualAdd = (e) => {
     e.preventDefault();
     if (!newItemName.trim()) return;
-    onAdd(newItemName.trim());
+    // DB에서 기본 단위 정보 조회
+    const dbItem = SHELF_LIFE_DB[newItemName.trim()] || SHELF_LIFE_DB[newItemName.trim().replace(/\s/g, '')];
+    let defaultUnit = 'g';
+    if (dbItem && dbItem.unit) {
+        const unitMatch = dbItem.unit.match(/[a-zA-Z가-힣]+/);
+        if (unitMatch) defaultUnit = unitMatch[0];
+    }
+    onAdd({ name: newItemName.trim(), unit: defaultUnit });
     setNewItemName('');
   };
 
@@ -1960,6 +1996,17 @@ function ShoppingCartView({ cart, ingredients, onUpdateCount, onRemove, onChecko
                         <input type="number" placeholder="0" value={item.price || ''} onChange={(e) => onUpdateDetail(item.id, { price: e.target.value })} className="w-full bg-white dark:bg-gray-600 dark:text-white border dark:border-gray-500 rounded px-1 py-1 text-sm outline-none focus:border-green-500" />
                     </div>
                 </div>
+                {/* 👇 위치 지정 드롭다운 추가 */}
+                <select value={item.location || ''} onChange={(e) => onUpdateDetail(item.id, { location: e.target.value })} className="w-full mt-2 p-2 bg-gray-50 dark:bg-gray-700 dark:text-white rounded-lg border dark:border-gray-600 text-xs outline-none">
+                    <option value="">📍 (자동 추천) {getRecommendedZone(item.name, 'fridge').split(':')[0]}</option>
+                    <optgroup label="🧊 냉장실">
+                        {Object.values(ZONES).filter(z => z.includes('냉장')).map(z => <option key={z} value={z}>{z}</option>)}
+                    </optgroup>
+                    <optgroup label="❄️ 냉동실">
+                        {Object.values(ZONES).filter(z => z.includes('냉동')).map(z => <option key={z} value={z}>{z}</option>)}
+                    </optgroup>
+                    <option value={ZONES.PANTRY}>{ZONES.PANTRY}</option>
+                </select>
             </div>
           )})}
           
@@ -2450,9 +2497,22 @@ function EditIngredientModal({ item, onClose, onUpdate }) {
           <div><label className="text-xs text-gray-500">이름</label><input type="text" value={data.name} onChange={e=>setData({...data, name: e.target.value})} className="w-full p-2 border rounded-lg font-bold"/></div>
           <div><label className="text-xs text-gray-500">위치 (LG 4도어)</label>
             <select value={data.location || ''} onChange={e=>setData({...data, location: e.target.value})} className="w-full p-2 border rounded-lg">
-                <option value="🥬 상칸: 신선 야채/과일실 (수분케어)">🥬 신선 야채실</option><option value="🚪 상칸: 도어 바스켓/매직스페이스">🚪 도어 바스켓</option><option value="🥘 상칸: 메인 선반 (반찬/요리)">🥘 메인 선반</option><option value="🥓 상칸: 멀티 수납 코너 (신선맞춤)">🥓 멀티 수납 코너</option><option value="❄️ 하칸: 냉동 서랍 (육류/생선)">❄️ 냉동 서랍</option><option value="🏠 실온: 다용도실/팬트리">🏠 실온</option>
+                <option value="">(선택 안함)</option>
+                {Object.values(ZONES).map(zone => (
+                    <option key={zone} value={zone}>{zone}</option>
+                ))}
             </select></div>
           <div className="flex gap-2"><div className="flex-1"><label className="text-xs text-gray-500">유통기한</label><input type="date" value={data.expiry} onChange={e=>setData({...data, expiry: e.target.value})} className="w-full p-2 border rounded-lg"/></div><div className="flex-1"><label className="text-xs text-gray-500">가격</label><input type="number" value={data.price} onChange={e=>setData({...data, price: e.target.value})} className="w-full p-2 border rounded-lg"/></div></div>
+        </div>
+        <div className="flex gap-2 mt-3">
+            <div className="flex-1">
+                <label className="text-xs text-gray-500">용량/수량</label>
+                <input type="number" value={data.amount || ''} onChange={e=>setData({...data, amount: e.target.value})} className="w-full p-2 border rounded-lg"/>
+            </div>
+            <div className="flex-1">
+                <label className="text-xs text-gray-500">단위</label>
+                <input type="text" value={data.unit || ''} onChange={e=>setData({...data, unit: e.target.value})} className="w-full p-2 border rounded-lg"/>
+            </div>
         </div>
         <div className="flex gap-2 mt-6"><button onClick={onClose} className="flex-1 py-3 bg-gray-100 rounded-xl font-bold text-gray-500">취소</button><button onClick={handleSubmit} className="flex-1 py-3 bg-green-600 text-white rounded-xl font-bold">저장하기</button></div>
       </div>
